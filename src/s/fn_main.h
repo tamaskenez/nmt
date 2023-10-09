@@ -1,5 +1,6 @@
 int main(int argc, char* argv[])
-// needs: <cstdlib>, <glog/logging.h>, <fmt/std.h>, ReadArgs, EntityKindOfStem, ReadFileAsLines
+// needs: <cstdlib>, <glog/logging.h>, <fmt/std.h>, ReadArgs, EntityKindOfStem, ReadFileAsLines,
+// needs: PreprocessSource
 {
     namespace fs = std::filesystem;
 
@@ -14,9 +15,13 @@ int main(int argc, char* argv[])
         auto kind = EntityKindOfStem(sf.stem().string());
         LOG_IF(FATAL, !kind) << fmt::format(
             "Source file name {} is not prefixed by Entitykind ({})", sf.filename(), sf);
-        auto maybeContent = ReadFile(sf);
-        LOG_IF(FATAL, !maybeContent) << fmt::format("Can't open file for reading: {}", sf);
-        auto& content = *maybeContent;
+        auto maybeSource = ReadFile(sf);
+        LOG_IF(FATAL, !maybeSource) << fmt::format("Can't open file for reading: {}", sf);
+        auto& source = *maybeSource;
+
+        auto pps = PreprocessSource(source);
+        LOG(FATAL);
+        // ...
     }
     return result;
 }

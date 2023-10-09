@@ -1,4 +1,5 @@
 #include "fn_EntityKindOfStem.h"
+#include "fn_PreprocessSource.h"
 #include "fn_ReadArgs.h"
 #include "fn_ReadFile.h"
 

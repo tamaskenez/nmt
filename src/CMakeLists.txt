@@ -6,4 +6,5 @@ add_executable(nmt ${sources})
 target_link_libraries(nmt PRIVATE
 	fmt::fmt
 	glog::glog
+	nonstd::expected-lite
 )
