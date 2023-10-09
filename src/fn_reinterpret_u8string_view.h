@@ -2,4 +2,4 @@
 
 #include <string_view>
 
-#include "s/fn_reinterpret_u8string_view_decl.h"
+std::u8string_view reinterpret_u8string_view(std::string_view sv);

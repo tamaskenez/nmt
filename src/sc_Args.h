@@ -1,5 +1,6 @@
 #pragma once
 
 #include <filesystem>
+#include <vector>
 
-#include "s/sc_Args_decl.h"
+#include "s/sc_Args.h"

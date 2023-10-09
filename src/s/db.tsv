@@ -1,7 +1,0 @@
-name	entityKind	fwd	declDeps.includes	declDeps.fwds	declDeps.decls	hasDef	defDeps.includes	defDeps.fwds	defDeps.decls	
-main	fn					1	<cstdlib>, <glog/logging.h>, <fmt/std.h>		ReadArgs	
-EntityKind	enum	enum EntityKind								
-Entity	sc	struct Entity	<string>,<vector>,<optional>	EntityKind						
-Args	sc	struct Args	<filesystem>							
-ReadArgs	fn				Args	1	<string_view>, <filesystem>, <optional>, <glog/logging.h>, <utility>			
-reinterpret_u8string_view	fn		<string_view>							

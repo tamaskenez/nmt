@@ -1,3 +1,4 @@
+// needs: <string>, <vector>, <optional>, EntityKind*
 struct Entity {
     std::string name;
     EntityKind entityKind;
@@ -6,5 +7,6 @@ struct Entity {
         std::vector<std::string> includes;
         std::vector<std::string> fwds;
         std::vector<std::string> decls;
-    } declDeps std::optional<defDeps>;
+    } declDeps;
+    std::optional<defDeps>;
 };

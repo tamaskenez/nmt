@@ -1,5 +1,5 @@
 enum class EntityKind {
+    enum_,
     fn,
-    enum,
     sc  // struct or class
 };
