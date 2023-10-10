@@ -19,9 +19,11 @@ int main(int argc, char* argv[])
         LOG_IF(FATAL, !maybeSource) << fmt::format("Can't open file for reading: {}", sf);
         auto& source = *maybeSource;
 
-        auto pps = PreprocessSource(source);
-        LOG(FATAL);
-        // ...
+        auto ppsOr = PreprocessSource(source);
+        if (!ppsOr) {
+            LOG(FATAL) << fmt::format("{} in {}", ppsOr.error(), sf);
+        }
+        auto& pps = *ppsOr;
     }
     return result;
 }

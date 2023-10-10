@@ -22,8 +22,9 @@ std::optional<EntityKind> EntityKindOfStem(std::string_view stem)
         }
     };
 
-    auto it = m.find(stem);
+    auto it = m.find(stem.substr(0, firstUnderscorePos));
     if (it == m.end()) {
         return std::nullopt;
     }
+    return it->second;
 }

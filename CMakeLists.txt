@@ -8,4 +8,8 @@ find_package(fmt REQUIRED)
 find_package(glog REQUIRED)
 find_package(expected-lite REQUIRED)
 
+set(WARNINGS_AS_ERRORS 1)
+include(build/cpp_warnings.cmake)
+add_compile_options(${PROJECT_WARNING_FLAGS})
+
 add_subdirectory(src)

@@ -1,9 +1,9 @@
 // Eats EOL, too.
 
-// needs: <nonstd/expected.hpp>, SpecialComment, <string>, <string_view>, <optional>, <utility>
-nonstd::expected<std::optional<std::pair<std::string_view, SpecialComment>>, std::string>
+// needs: <nonstd/expected.hpp>, <string>, <string_view>, <optional>, <utility>
+nonstd::expected<std::optional<std::pair<std::string_view, std::vector<std::string>>>, std::string>
 TryEatSpecialComment(std::string_view sv)
-// needs: TryEatPrefix, EatBlank, EatWhileNot, <glog/logging.h>
+// needs: TryEatPrefix, EatBlank, EatWhileNot, <glog/logging.h>, <fmt/core.h>
 {
     auto afterSlashSlash = TryEatPrefix(sv, "//");
     if (!afterSlashSlash) {
@@ -15,32 +15,42 @@ TryEatSpecialComment(std::string_view sv)
     }
     // Read comma-separated list.
     std::vector<std::string> items;
+    sv = *afterNeeds;
     for (;;) {
-        sv = EatBlank(*afterNeeds);
+        sv = EatBlank(sv);
         if (sv.empty()) {
             break;
         }
-        if (sv.front() == '<') {
-            sv.remove_prefix(1);
-            constexpr std::string_view terminatingChars = ">\n";
-            auto tv = EatWhileNot(sv, terminatingChars);
-            CHECK(tv.empty() || terminatingChars.find(tv.front()) != std::string_view::npos);
-            if (tv.empty() || tv.front() != '>') {
-                return nonstd::make_unexpected("'// needs:' comment contains unclosed '<>' item");
+        if (sv.front() == '<' || sv.front() == '"') {
+            constexpr std::string_view angleBracketChars = "<>\n";
+            constexpr std::string_view doubleQuoteChars = "\"\"\n";
+            auto chars = sv.front() == '<' ? angleBracketChars : doubleQuoteChars;
+            auto tv = EatWhileNot(sv.substr(1), chars.substr(1));
+            CHECK(tv.empty() || chars.substr(1).find(tv.front()) != std::string_view::npos);
+            if (tv.empty() || tv.front() != chars[1]) {
+                return nonstd::make_unexpected(fmt::format(
+                    "'// needs:' comment contains unclosed '{}' item", chars.substr(0, 2)));
             }
-            sv.remove_suffix(sv.size() - tv.size());
+            sv.remove_suffix(tv.size() - 1);
+            items.push_back(std::string(sv));
+            sv = tv.substr(1);
+        } else {
+            auto tv = EatWhileNot(sv.substr(1), " \t\n");
+            sv.remove_suffix(tv.size());
             items.push_back(std::string(sv));
             sv = tv;
-        } else if (sv.front() == '\"') {
-            sv.remove_prefix(1);
-            LOG(FATAL);
-            // ...
-        } else {
-            LOG(FATAL);
-            // ...
         }
-        LOG(FATAL);
-        // ...
+        sv = EatBlank(sv);
+        if (sv.empty() || sv.front() == '\n') {
+            if (sv.front() == '\n') {
+                sv.remove_prefix(1);
+            }
+            break;
+        }
+        if (sv.front() != ',') {
+            return nonstd::make_unexpected("'needs: ' missing comma in list");
+        }
+        sv.remove_prefix(1);
     }
-    return std::nullopt;
+    return std::make_optional(std::make_pair(sv, std::move(items)));
 }

@@ -4,6 +4,7 @@
 #include "fn_EatWhileNot.h"
 #include "fn_TryEatPrefix.h"
 
+#include <fmt/core.h>
 #include <glog/logging.h>
 
 #include "s/fn_TryEatSpecialComment.h"
