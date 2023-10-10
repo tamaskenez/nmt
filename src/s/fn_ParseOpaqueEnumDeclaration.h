@@ -1,10 +1,10 @@
 // needs: <string_view>, <nonstd/expected.hpp>, <utility>, <string>
 nonstd::expected<std::pair<std::string, std::string>, std::string> ParseOpaqueEnumDeclaration(
-    std::string_view sv) {
-    // needs: EatBlank, TryEatPrefix, EatSpace, EatWhileNot
-    // needs: ExtractIdentifier, <fmt/std.h>, Trim
-    // needs: CompactSpaces
-
+    std::string_view sv)
+// needs: EatBlank, TryEatPrefix, EatSpace, EatWhileNot
+// needs: ExtractIdentifier, <fmt/std.h>, Trim
+// needs: CompactSpaces
+{
     // Find the "opaque enum declaration" part of the source:
     //     enum(class|struct)?([[...]])?<NAME>(:<BASE>)?{
     auto sv0 = EatBlank(sv);

@@ -35,7 +35,7 @@ TryEatSpecialComment(std::string_view sv)
             items.push_back(std::string(sv));
             sv = tv.substr(1);
         } else {
-            auto tv = EatWhileNot(sv.substr(1), " \t\n");
+            auto tv = EatWhileNot(sv.substr(1), " ,\t\n");
             sv.remove_suffix(tv.size());
             items.push_back(std::string(sv));
             sv = tv;
