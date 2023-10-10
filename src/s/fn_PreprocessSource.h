@@ -77,7 +77,6 @@ nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_v
             } break;
         }
     }
-    printf("%s\n", ppSource.c_str());
     return PreprocessedSource{.ppSource = std::move(ppSource),
                               .specialComments = std::move(specialComments)};
 }
