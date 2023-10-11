@@ -1,6 +1,7 @@
 // needs: Args
 Args ReadArgs(int argc, char* argv[])
 // needs: <string_view>, <filesystem>, <optional>, <glog/logging.h>, <utility>, <vector>
+// needs: reinterpret_as_u8string_view
 {
     using path = std::filesystem::path;
     std::vector<path> arg_s, arg_sf;
@@ -14,14 +15,14 @@ Args ReadArgs(int argc, char* argv[])
         };
         if (ai == "--sources") {
             while (i + 1 < argc && argv[i + 1][0] != '-') {
-                arg_s.emplace_back(reinterpret_u8string_view(argv[++i]));
+                arg_s.emplace_back(reinterpret_as_u8string_view(argv[++i]));
             }
         } else if (ai == "--output-dir") {
             LOG_IF(FATAL, arg_o) << "--output-dir specified multiple times";
-            arg_o = path(reinterpret_u8string_view(nextArg("--output-dir")));
+            arg_o = path(reinterpret_as_u8string_view(nextArg("--output-dir")));
         } else if (ai == "--sources-files") {
             while (i + 1 < argc && argv[i + 1][0] != '-') {
-                arg_sf.emplace_back(reinterpret_u8string_view(argv[++i]));
+                arg_sf.emplace_back(reinterpret_as_u8string_view(argv[++i]));
             }
         } else {
             LOG(FATAL) << "Invalid argument: " << ai;

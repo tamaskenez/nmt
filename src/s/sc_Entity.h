@@ -1,12 +1,12 @@
-// needs: <string>, <vector>, <optional>, EntityKind*
+// needs: EntityKind*, <string>, <filesystem>, <vector>
 struct Entity {
+    EntityKind kind;
     std::string name;
-    EntityKind entityKind;
-    std::string fwd;
-    struct Dependencies {
-        std::vector<std::string> includes;
-        std::vector<std::string> fwds;
-        std::vector<std::string> decls;
-    } declDeps;
-    std::optional<defDeps>;
+    // lightDeclaration is
+    // - opaque-enum-declaration for enums
+    // - forward-declaration for structs, classes
+    // - function-declaration for functions
+    std::string lightDeclaration;
+    std::filesystem::path path;
+    std::vector<std::string> declNeeds, defNeeds;
 };
