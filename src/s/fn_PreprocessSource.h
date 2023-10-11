@@ -1,6 +1,6 @@
 // needs: PreprocessedSource, <string_view>, <nonstd/expected.hpp>
 nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv) {
-    // needs: EatBlank, TryEatSpecialComment, TryEatPrefix, <glog/logging.h>,
+    // needs: EatBlank, TryEatSpecialComment, TryEatPrefix, <glog/logging.h>
     // needs: <utility>, <optional>, EatWhileNot
     enum class State { atStartOfLine, inMiddleOfLine } state = State::atStartOfLine;
     std::string ppSource;

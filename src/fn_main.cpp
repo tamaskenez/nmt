@@ -7,6 +7,7 @@
 #include "fn_PreprocessSource.h"
 #include "fn_ReadArgs.h"
 #include "fn_ReadFile.h"
+#include "fn_ReadFileAsLines.h"
 
 #include <fmt/std.h>
 #include <glog/logging.h>

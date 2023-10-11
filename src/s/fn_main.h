@@ -1,17 +1,28 @@
 int main(int argc, char* argv[])
-// needs: <cstdlib>, <glog/logging.h>, <fmt/std.h>, ReadArgs, EntityKindOfStem, ReadFileAsLines,
+// needs: <cstdlib>, <glog/logging.h>, <fmt/std.h>, ReadArgs, EntityKindOfStem, ReadFileAsLines
 // needs: PreprocessSource, EntityKind, ParseOpaqueEnumDeclaration
 // needs: EntityKindLongName
 // needs: ParseFunctionDeclaration
 // needs: ParseStructClassDeclaration
+// needs: ReadFileAsLines
 {
     namespace fs = std::filesystem;
 
     google::InitGoogleLogging(argv[0]);
     // Read args.
     auto args = ReadArgs(argc, argv);
-    fmt::print("-s: {}\n", fmt::join(args.sourceFiles, ", "));
+    fmt::print("-s: {}\n", fmt::join(args.sources, ", "));
+    fmt::print("-f: {}\n", fmt::join(args.sourcesFiles, ", "));
     fmt::print("-o: {}\n", args.outputDir);
+
+    for (auto& f : args.sourcesFiles) {
+        auto pathList = ReadFileAsLines(f);
+        LOG_IF(FATAL, !pathList) << fmt::format("Can't read file list from {}.", f);
+        args.sources.insert(args.sources.end(), pathList->begin(), pathList->end());
+    }
+
+    std::sort(args.sources.begin(), args.sources.end());
+
     int result = EXIT_SUCCESS;
 
     struct Entity {
@@ -26,7 +37,7 @@ int main(int argc, char* argv[])
     };
     std::unordered_map<std::string, Entity> entities;
 
-    for (auto& sf : args.sourceFiles) {
+    for (auto& sf : args.sources) {
         // Find kind.
         auto maybeSource = ReadFile(sf);
         LOG_IF(FATAL, !maybeSource) << fmt::format("Can't open file for reading: {}", sf);
