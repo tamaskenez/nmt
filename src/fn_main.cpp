@@ -9,6 +9,7 @@
 #include "fn_ReadArgs.h"
 #include "fn_ReadFile.h"
 #include "fn_ReadFileAsLines.h"
+#include "fn_WriteFile.h"
 #include "fn_reinterpret_as_u8string_view.h"
 #include "sc_Entity.h"
 
@@ -17,5 +18,6 @@
 
 #include <cstdlib>
 #include <iterator>
+#include <unordered_set>
 
 #include "s/fn_main.h"

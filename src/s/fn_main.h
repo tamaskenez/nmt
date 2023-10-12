@@ -5,7 +5,7 @@ int main(int argc, char* argv[])
 // needs: ParseFunctionDeclaration
 // needs: ParseStructClassDeclaration
 // needs: ReadFileAsLines, Entity, <iterator>
-// needs: reinterpret_as_u8string_view
+// needs: reinterpret_as_u8string_view, <unordered_set>, WriteFile
 {
     namespace fs = std::filesystem;
 
@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
     // Canonicalize source paths.
     for (auto& sf : args.sources) {
         std::error_code ec;
-        auto c = std::filesystem::canonical(sf, ec);
+        auto c = fs::canonical(sf, ec);
         LOG_IF(FATAL, ec) << fmt::format("Source not found ({}): {}", ec.message(), sf);
         sf = c;
     }
@@ -88,6 +88,26 @@ int main(int argc, char* argv[])
                 break;
         }
     }
+
+    std::error_code ec;
+    fs::create_directories(args.outputDir, ec);
+    LOG_IF(FATAL, ec) << fmt::format("Can't create output directory {}.", args.outputDir);
+
+    auto dit = fs::directory_iterator(args.outputDir, fs::directory_options::none, ec);
+    LOG_IF(FATAL, ec) << fmt::format("Can't get listing of output directory {}.", args.outputDir);
+    struct path_hash {
+        size_t operator()(const fs::path p) const {
+            return hash_value(p);
+        }
+    };
+    std::unordered_set<fs::path, path_hash> remainingExistingFiles;
+    for (auto const& de : dit) {
+        auto ext = de.path().extension().string();
+        if (ext == ".h" || ext == ".cpp") {
+            remainingExistingFiles.insert(de.path());
+        }
+    }
+    std::vector<fs::path> currentFiles;
 
     for (auto& [_, e] : entities) {
         std::vector<std::string> generateds, locals, externalsInDirs, externalWithExtension,
@@ -150,8 +170,8 @@ int main(int argc, char* argv[])
                     } else {
                         auto filename =
                             fmt::format("{}_{}.h", EntityKindShortName(ne.kind), ne.name);
-                        auto path = args.outputDir
-                                  / std::filesystem::path(reinterpret_as_u8string_view(filename));
+                        auto path =
+                            args.outputDir / fs::path(reinterpret_as_u8string_view(filename));
                         generateds.push_back(fmt::format("\"{}\"", path));
                     }
                 }
@@ -190,10 +210,31 @@ int main(int argc, char* argv[])
                 break;
         }
         fmt::print("---- name: {} ----\n{}\n", e.name, content);
-        // TODO: write content to header
-        //  - write only if needed (don't write if same content)
-        //  - collect file paths written (even if unchanged)
-        //  - remember if any new file
+        auto headerPath =
+            args.outputDir / fmt::format("{}_{}.h", EntityKindShortName(e.kind), e.name);
+        remainingExistingFiles.erase(headerPath);
+        currentFiles.push_back(headerPath);
+        auto existingHeaderContent = ReadFile(headerPath);
+        if (existingHeaderContent == content) {
+            // No change, no need to write.
+            continue;
+        }
+        LOG_IF(FATAL, !WriteFile(headerPath, content))
+            << fmt::format("Couldn't write {}.", headerPath);
+    }
+    for (auto& f : remainingExistingFiles) {
+        fs::remove(f, ec);  // Ignore if couldn't remove it.
+    }
+    std::string fileListContent;
+    std::sort(currentFiles.begin(), currentFiles.end());
+    for (auto& c : currentFiles) {
+        fileListContent += fmt::format("{}\n", c);
+    }
+    auto filesPath = args.outputDir / "files.txt";
+    auto existingFileListContent = ReadFile(filesPath);
+    if (existingFileListContent != fileListContent) {
+        LOG_IF(FATAL, !WriteFile(filesPath, fileListContent))
+            << fmt::format("Could write file list: {}.", filesPath);
     }
 
     return result;

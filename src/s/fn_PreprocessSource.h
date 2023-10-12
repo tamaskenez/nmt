@@ -70,7 +70,9 @@ nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_v
                 }
                 char c = sv.front();
                 sv.remove_prefix(1);
-                ppSource += c;
+                if (!isspace(c) || !ppSource.empty()) {  // Skip leading spaces.
+                    ppSource += c;
+                }
                 if (c == '\n') {
                     state = State::atStartOfLine;
                 }
