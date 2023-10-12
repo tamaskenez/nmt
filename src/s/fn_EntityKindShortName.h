@@ -1,6 +1,6 @@
 // needs: <string_view>, EntityKind*
 std::string_view EntityKindShortName(EntityKind ek)
-// needs: EntityKind;
+// needs: EntityKind
 {
     switch (ek) {
         case EntityKind::enum_:

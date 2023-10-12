@@ -1,6 +1,6 @@
 // needs: <optional>, <string>, EntityKind*, <string_view>
 std::optional<EntityKind> EntityKindOfStem(std::string_view stem)
-// needs: EntityKind, <unordered_map>, "macros.h"
+// needs: EntityKind, <unordered_map>
 {
     auto firstUnderscorePos = stem.find('_');
     if (firstUnderscorePos == std::string::npos) {
