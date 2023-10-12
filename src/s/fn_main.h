@@ -2,7 +2,7 @@ int main(int argc, char* argv[])
 // needs: <cstdlib>, <glog/logging.h>, <fmt/std.h>, ReadArgs, EntityKindOfStem, ReadFileAsLines
 // needs: PreprocessSource, EntityKind, ParseOpaqueEnumDeclaration
 // needs: EntityKindLongName, EntityKindShortName
-// needs: ParseFunctionDeclaration
+// needs: ParseFunctionDeclaration, ReadFile
 // needs: ParseStructClassDeclaration
 // needs: ReadFileAsLines, Entity, <iterator>
 // needs: reinterpret_as_u8string_view, <unordered_set>, WriteFile
