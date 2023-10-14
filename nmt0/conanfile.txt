@@ -1,0 +1,7 @@
+[requires]
+fmt/10.1.1
+glog/0.6.0
+expected-lite/0.6.3
+
+[generators]
+CMakeDeps
