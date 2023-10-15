@@ -2,3 +2,8 @@
 
 conan install conanfile.txt -b missing -pr:b default -if i/cmake -of i/cmake -s build_type=Debug
 # conan install conanfile.txt -b missing -pr:b default -if i/cmake -of i/cmake -s build_type=Release
+
+
+readonly qt6config=i/cmake/Qt6Config.cmake
+grep -q "__qt_internal_cmake_apple_support_files_path" <$qt6config || \
+	echo 'set(__qt_internal_cmake_apple_support_files_path "${qt_PACKAGE_FOLDER_DEBUG}/lib/cmake/Qt6/macos")' >> $qt6config

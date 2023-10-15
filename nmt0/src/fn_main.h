@@ -62,7 +62,8 @@ int main(int argc, char* argv[])
         auto f = [&declNeeds, &defNeeds, &sf, &entities](
                      nonstd::expected<std::pair<std::string, std::string>, std::string> edOr,
                      EntityKind kind) {
-            LOG_IF(FATAL, !edOr) << fmt::format("Can't parse {}: {}, reason: {}", EntityKindLongName(kind), sf, edOr.error());
+            LOG_IF(FATAL, !edOr) << fmt::format(
+                "Can't parse {}: {}, reason: {}", EntityKindLongName(kind), sf, edOr.error());
             auto entity = Entity{.kind = kind,
                                  .name = edOr->first,
                                  .lightDeclaration = std::move(edOr->second),
