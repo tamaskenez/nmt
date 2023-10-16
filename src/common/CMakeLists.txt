@@ -1,0 +1,5 @@
+file(GLOB sources CONFIGURE_DEPENDS *.h)
+file(GLOB sourcespp CONFIGURE_DEPENDS *.hpp *.cpp)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sources} ${sourcespp})
+add_library(common STATIC ${sources} ${sourcespp})
+run_nmt(common FILES ${sources})

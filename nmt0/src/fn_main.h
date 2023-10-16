@@ -12,16 +12,19 @@ int main(int argc, char* argv[])
     google::InitGoogleLogging(argv[0]);
     // Read args.
     auto args = ReadArgs(argc, argv);
-    fmt::print("-s: {}\n", fmt::join(args.sources, ", "));
-    fmt::print("-f: {}\n", fmt::join(args.sourcesFiles, ", "));
-    fmt::print("-o: {}\n", args.outputDir);
+    fmt::print("-s {}\n", fmt::join(args.sources, ", "));
+    fmt::print("-f {}\n", fmt::join(args.sourcesFiles, ", "));
+    fmt::print("-o {}\n", args.outputDir);
 
     for (auto& f : args.sourcesFiles) {
         auto pathList = ReadFileAsLines(f);
-        LOG_IF(FATAL, !pathList) << fmt::format("Can't read file list from {}.", f);
-        args.sources.insert(args.sources.end(),
-                            std::make_move_iterator(pathList->begin()),
-                            std::make_move_iterator(pathList->end()));
+        LOG_IF(FATAL, !pathList) << fmt::format("Can't read file list from `{}`.", f);
+        args.sources.reserve(args.sources.size() + pathList->size());
+        for (auto& p : *pathList) {
+            if (!p.empty()) {
+                args.sources.push_back(std::move(p));
+            }
+        }
     }
 
     int result = EXIT_SUCCESS;
@@ -32,14 +35,14 @@ int main(int argc, char* argv[])
     for (auto& sf : args.sources) {
         std::error_code ec;
         auto c = fs::canonical(sf, ec);
-        LOG_IF(FATAL, ec) << fmt::format("Source not found ({}): {}", ec.message(), sf);
+        LOG_IF(FATAL, ec) << fmt::format("Source not found ({}): `{}`", ec.message(), sf);
         sf = c;
     }
 
     for (auto& sf : args.sources) {
         // Find kind.
         auto maybeSource = ReadFile(sf);
-        LOG_IF(FATAL, !maybeSource) << fmt::format("Can't open file for reading: {}", sf);
+        LOG_IF(FATAL, !maybeSource) << fmt::format("Can't open file for reading: `{}`", sf);
         auto& source = *maybeSource;
 
         auto ppsOr = PreprocessSource(source);
@@ -49,7 +52,9 @@ int main(int argc, char* argv[])
 
         auto kind = EntityKindOfStem(sf.stem().string());
         LOG_IF(FATAL, !kind) << fmt::format(
-            "Source file name {} is not prefixed by Entitykind ({})", sf.filename(), sf);
+            "Source file name `{}` is not prefixed by Entitykind (in file `{}`)",
+            sf.filename(),
+            sf);
 
         std::vector<std::string> declNeeds, defNeeds;
         for (auto& sc : ppsOr->specialComments) {
@@ -62,8 +67,10 @@ int main(int argc, char* argv[])
         auto f = [&declNeeds, &defNeeds, &sf, &entities](
                      nonstd::expected<std::pair<std::string, std::string>, std::string> edOr,
                      EntityKind kind) {
-            LOG_IF(FATAL, !edOr) << fmt::format(
-                "Can't parse {}: {}, reason: {}", EntityKindLongName(kind), sf, edOr.error());
+            LOG_IF(FATAL, !edOr) << fmt::format("Can't parse {}: int file `{}`, reason: {}",
+                                                EntityKindLongName(kind),
+                                                sf,
+                                                edOr.error());
             auto entity = Entity{.kind = kind,
                                  .name = edOr->first,
                                  .lightDeclaration = std::move(edOr->second),
@@ -92,10 +99,10 @@ int main(int argc, char* argv[])
 
     std::error_code ec;
     fs::create_directories(args.outputDir, ec);
-    LOG_IF(FATAL, ec) << fmt::format("Can't create output directory {}.", args.outputDir);
+    LOG_IF(FATAL, ec) << fmt::format("Can't create output directory `{}`.", args.outputDir);
 
     auto dit = fs::directory_iterator(args.outputDir, fs::directory_options::none, ec);
-    LOG_IF(FATAL, ec) << fmt::format("Can't get listing of output directory {}.", args.outputDir);
+    LOG_IF(FATAL, ec) << fmt::format("Can't get listing of output directory `{}`.", args.outputDir);
     struct path_hash {
         size_t operator()(const fs::path p) const {
             return hash_value(p);

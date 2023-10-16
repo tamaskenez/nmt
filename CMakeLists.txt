@@ -44,6 +44,7 @@ function(run_nmt target)
 	file(STRINGS ${sources_output_dir}/files.txt generated_files)
 	source_group(boilerplate FILES ${sources_output_dir}/files.txt ${generated_files})
 	target_sources(${target} PRIVATE ${sources_output_dir}/files.txt ${generated_files})
+	target_include_directories(${target} PUBLIC ${sources_output_dir})
 
 	add_custom_command(TARGET ${target}
 	                   PRE_BUILD
