@@ -1,8 +1,8 @@
-file(GLOB sources CONFIGURE_DEPENDS *.h)
-file(GLOB sourcespp CONFIGURE_DEPENDS *.hpp *.cpp)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sources} ${sourcespp}})
-add_library(nmtapp STATIC ${sources} ${sourcespp})
-run_nmt(nmtapp FILES ${sources})
+file(GLOB sourcese CONFIGURE_DEPENDS e/*.h)
+file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sourcese} ${sources}})
+add_library(nmtapp STATIC ${sourcese} ${sources})
+run_nmt(nmtapp FILES ${sourcese})
 
 target_link_libraries(nmtapp PRIVATE
 	common

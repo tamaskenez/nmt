@@ -1,10 +1,10 @@
-file(GLOB sources CONFIGURE_DEPENDS *.h)
-file(GLOB sourcespp CONFIGURE_DEPENDS *.hpp *.cpp)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sources} ${sourcespp})
+file(GLOB sourcese CONFIGURE_DEPENDS e/*.h)
+file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sourcese} ${sources})
 
-qt_add_library(qtui ${sources} ${sourcespp})
+qt_add_library(qtui ${sourcese} ${sources})
 
-run_nmt(qtui FILES ${sources})
+run_nmt(qtui FILES ${sourcese})
 
 target_link_libraries(qtui PRIVATE
 	common

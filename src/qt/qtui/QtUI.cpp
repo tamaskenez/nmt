@@ -1,6 +1,6 @@
-#include "QtUI.hpp"
+#include "QtUI.h"
 
-#include "MainWindow.hpp"
+#include "MainWindow.h"
 
 #include <QApplication>
 

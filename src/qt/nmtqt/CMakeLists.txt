@@ -1,12 +1,13 @@
+file(GLOB sourcese CONFIGURE_DEPENDS e/*.h)
 file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sources})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sourcese} ${sources})
 
 qt_add_executable(nmtqt
 	WIN32 MACOSX_BUNDLE
-  ${sources}
+  ${sourcese} ${sources}
 )
 
-run_nmt(nmtqt FILES ${sources})
+run_nmt(nmtqt FILES ${sourcese})
 
 set_target_properties(nmtqt PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "nmt"

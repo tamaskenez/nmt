@@ -1,5 +1,5 @@
 int main(int argc, char* argv[])
-// needs: "QtUI.hpp", "NmtApp.hpp", <utility>
+// needs: "QtUI.h", "NmtApp.h", <utility>
 {
     auto ui = QtUI_make(argc, argv);
     auto app = NmtApp::make(argc, argv);
