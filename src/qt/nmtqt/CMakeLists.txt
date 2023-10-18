@@ -9,9 +9,19 @@ qt_add_executable(nmtqt
 run_nmt(nmtqt FILES ${sources})
 
 set_target_properties(nmtqt PROPERTIES
-    MACOSX_BUNDLE_GUI_IDENTIFIER nmtqt.tamas.com
+    MACOSX_BUNDLE_BUNDLE_NAME "nmt"
+    MACOSX_BUNDLE_COPYRIGHT "© 2023 Tamas"
+    #MACOSX_BUNDLE_EXECUTABLE_NAME
+    #MACOSX_BUNDLE_ICON_FILE
+    #MACOSX_BUNDLE_INFO_PLIST
+    #MACOSX_PACKAGE_LOCATION
+    #PRODUCT_NAME? # CFBundleName
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_GUI_IDENTIFIER nmtqt.tamas.com # CFBundleIdentifier
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    #XCODE_ATTRIBUTE_MARKETING_VERSION 1.2
+    #XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION 3.4
+    #XCODE_ATTRIBUTE_INFOPLIST_KEY_NSHumanReadableCopyright "the copyright 2"
 )
 
 target_link_libraries(nmtqt PRIVATE
@@ -19,3 +29,5 @@ target_link_libraries(nmtqt PRIVATE
     qtui
     nmtapp
 )
+
+

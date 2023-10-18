@@ -1,5 +1,7 @@
 #include "QtUI.hpp"
 
+#include "MainWindow.hpp"
+
 #include <QApplication>
 
 struct QtUI : UI {
@@ -8,6 +10,8 @@ struct QtUI : UI {
     QtUI(int& argc, char* argv[])
         : _application(argc, argv) {}
     int exec() override {
+        MainWindow mw;
+        mw.show();
         return _application.exec();
     }
 };
