@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(nmt VERSION 0.1)
 
-message(STATUS "CMAKE_PREFIX_PATH:")
 foreach(i IN LISTS CMAKE_PREFIX_PATH)
 	message(STATUS "${i}")
 endforeach()
@@ -42,6 +41,7 @@ function(run_nmt target)
 		COMMAND_ERROR_IS_FATAL ANY
 	)
 	file(STRINGS ${sources_output_dir}/files.txt generated_files)
+	message(STATUS "reading file list ${sources_output_dir}/files.txt -> ${generated_files}")
 	source_group(boilerplate FILES ${sources_output_dir}/files.txt ${generated_files})
 	target_sources(${target} PRIVATE ${sources_output_dir}/files.txt ${generated_files})
 	target_include_directories(${target} PUBLIC ${sources_output_dir})
