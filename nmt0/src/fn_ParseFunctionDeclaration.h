@@ -1,5 +1,5 @@
-// needs: <string_view>, <nonstd/expected.hpp>, <utility>, <string>
-nonstd::expected<std::pair<std::string, std::string>, std::string> ParseFunctionDeclaration(
+// needs: <string_view>, <expected>, <utility>, <string>
+std::expected<std::pair<std::string, std::string>, std::string> ParseFunctionDeclaration(
     std::string_view sv)
 // needs: EatBlank
 // needs: ExtractIdentifier, <fmt/std.h>, Trim
@@ -11,14 +11,14 @@ nonstd::expected<std::pair<std::string, std::string>, std::string> ParseFunction
     auto sv0 = EatBlank(sv);
     auto firstOpeningParenthesis = sv0.find('(');
     if (firstOpeningParenthesis == std::string_view::npos) {
-        return nonstd::make_unexpected("Can't find first opening parentheses.");
+        return std::unexpected("Can't find first opening parentheses.");
     }
     auto firstOpeningCurlyBracket = sv0.find('{');
     if (firstOpeningParenthesis == std::string_view::npos) {
-        return nonstd::make_unexpected("Can't find first opening curly bracket.");
+        return std::unexpected("Can't find first opening curly bracket.");
     }
     if (firstOpeningParenthesis >= firstOpeningCurlyBracket) {
-        return nonstd::make_unexpected(
+        return std::unexpected(
             "First opening curly bracket found before the first opening parentheses.");
     }
     auto tv = Trim(sv0.substr(0, firstOpeningParenthesis));
@@ -28,7 +28,7 @@ nonstd::expected<std::pair<std::string, std::string>, std::string> ParseFunction
     }
     auto finalName = ExtractIdentifier(tv.substr(i));
     if (!finalName) {
-        return nonstd::make_unexpected(fmt::format("Can't extract function name from `{}`", tv));
+        return std::unexpected(fmt::format("Can't extract function name from `{}`", tv));
     }
     auto finalDeclaration = CompactSpaces(sv0.substr(0, firstOpeningCurlyBracket));
 

@@ -10,4 +10,6 @@
 
 #include <fmt/std.h>
 
+#include <cassert>
+
 #include "../fn_ParseOpaqueEnumDeclaration.h"

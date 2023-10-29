@@ -2,10 +2,12 @@
 
 #include <QGuiApplication>
 #include <QScreen>
+#include <QTextEdit>
 
 MainWindow::MainWindow() {
-    auto* cw = new QWidget;
-    setCentralWidget(cw);
+    editor = new QTextEdit;
+
+    setCentralWidget(editor);
 
     setWindowTitle(tr("NMT"));
 

@@ -16,8 +16,11 @@
 #include <fmt/std.h>
 #include <glog/logging.h>
 
+#include <algorithm>
+#include <cassert>
 #include <cstdlib>
 #include <iterator>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "../fn_main.h"

@@ -4,6 +4,7 @@
 
 #include <glog/logging.h>
 
+#include <optional>
 #include <string_view>
 
 #include "../fn_ReadArgs.h"

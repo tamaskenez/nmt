@@ -58,3 +58,5 @@ function(run_nmt target)
 endfunction()
 
 add_subdirectory(src)
+add_subdirectory(test)
+

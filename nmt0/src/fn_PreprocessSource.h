@@ -1,5 +1,5 @@
-// needs: PreprocessedSource, <string_view>, <nonstd/expected.hpp>
-nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv) {
+// needs: PreprocessedSource, <string_view>, <expected>
+std::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv) {
     // needs: EatBlank, TryEatSpecialComment, TryEatPrefix, <glog/logging.h>
     // needs: <utility>, <optional>, EatWhileNot
     enum class State { atStartOfLine, inMiddleOfLine } state = State::atStartOfLine;
@@ -11,7 +11,7 @@ nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_v
                 sv = EatBlank(sv);
                 auto maybeSpecialCommentOr = TryEatSpecialComment(sv);
                 if (!maybeSpecialCommentOr) {
-                    return nonstd::make_unexpected(std::move(maybeSpecialCommentOr.error()));
+                    return std::unexpected(std::move(maybeSpecialCommentOr.error()));
                 }
                 if (auto& maybeSpecialComment = *maybeSpecialCommentOr) {
                     sv = maybeSpecialComment->first;
@@ -41,7 +41,7 @@ nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_v
                         sv.remove_prefix(1);
                     }
                     if (inComment) {
-                        return nonstd::make_unexpected("`/*` comment is not closed.");
+                        return std::unexpected("`/*` comment is not closed.");
                     }
                     continue;
                 } else if ((tv = TryEatPrefix(sv, "\""))) {
@@ -52,7 +52,7 @@ nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_v
                         ppSource += sv.substr(0, sv.size() - tv->size());
                         sv = *tv;
                         if (sv.empty()) {
-                            return nonstd::make_unexpected("Unclosed double-quote.");
+                            return std::unexpected("Unclosed double-quote.");
                         } else if (sv.front() == '"') {
                             bool escaped = ppSource.back() == '\\';
                             ppSource += '"';

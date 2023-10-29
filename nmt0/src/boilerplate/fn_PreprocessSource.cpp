@@ -7,6 +7,7 @@
 
 #include <glog/logging.h>
 
+#include <cassert>
 #include <optional>
 #include <utility>
 

@@ -2,8 +2,8 @@
 
 #include "sc_PreprocessedSource.h"
 
-#include <nonstd/expected.hpp>
+#include <expected>
 
 #include <string_view>
 
-nonstd::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv);
+std::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv);

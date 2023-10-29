@@ -1,7 +1,7 @@
 // Eats EOL, too.
 
-// needs: <nonstd/expected.hpp>, <string>, <string_view>, <optional>, <utility>
-nonstd::expected<std::optional<std::pair<std::string_view, std::vector<std::string>>>, std::string>
+// needs: <expected>, <string>, <string_view>, <optional>, <utility>
+std::expected<std::optional<std::pair<std::string_view, std::vector<std::string>>>, std::string>
 TryEatSpecialComment(std::string_view sv)
 // needs: TryEatPrefix, EatBlank, EatWhileNot, <glog/logging.h>, <fmt/core.h>
 {
@@ -28,7 +28,7 @@ TryEatSpecialComment(std::string_view sv)
             auto tv = EatWhileNot(sv.substr(1), chars.substr(1));
             CHECK(tv.empty() || chars.substr(1).find(tv.front()) != std::string_view::npos);
             if (tv.empty() || tv.front() != chars[1]) {
-                return nonstd::make_unexpected(fmt::format(
+                return std::unexpected(fmt::format(
                     "'// needs:' comment contains unclosed '{}' item", chars.substr(0, 2)));
             }
             sv.remove_suffix(tv.size() - 1);
@@ -48,7 +48,7 @@ TryEatSpecialComment(std::string_view sv)
             break;
         }
         if (sv.front() != ',') {
-            return nonstd::make_unexpected("'needs: ' missing comma in list");
+            return std::unexpected("'needs: ' missing comma in list");
         }
         sv.remove_prefix(1);
     }

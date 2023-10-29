@@ -1,5 +1,5 @@
-// needs: <string_view>, <nonstd/expected.hpp>, <utility>, <string>
-nonstd::expected<std::pair<std::string, std::string>, std::string> ParseOpaqueEnumDeclaration(
+// needs: <string_view>, <expected>, <utility>, <string>
+std::expected<std::pair<std::string, std::string>, std::string> ParseOpaqueEnumDeclaration(
     std::string_view sv)
 // needs: EatBlank, TryEatPrefix, EatSpace, EatWhileNot
 // needs: ExtractIdentifier, <fmt/std.h>, Trim
@@ -10,11 +10,11 @@ nonstd::expected<std::pair<std::string, std::string>, std::string> ParseOpaqueEn
     auto sv0 = EatBlank(sv);
     auto tv = TryEatPrefix(sv0, "enum");
     if (!tv) {
-        return nonstd::make_unexpected("First word must be enum.");
+        return std::unexpected("First word must be enum.");
     }
     sv = *tv;
     if (sv.empty()) {
-        return nonstd::make_unexpected("Missing declaration after `enum`.");
+        return std::unexpected("Missing declaration after `enum`.");
     }
     bool hadSeparator = false;
     if (isspace(sv.front())) {
@@ -39,27 +39,27 @@ nonstd::expected<std::pair<std::string, std::string>, std::string> ParseOpaqueEn
             sv.remove_prefix(1);
         }
         if (!found) {
-            return nonstd::make_unexpected("Unclosed `[[` in `enum`.");
+            return std::unexpected("Unclosed `[[` in `enum`.");
         }
         hadSeparator = true;
     }
     if (!hadSeparator) {
-        return nonstd::make_unexpected("Invalid `enum` declaration or missing name.");
+        return std::unexpected("Invalid `enum` declaration or missing name.");
     }
 
     auto uv = EatWhileNot(sv, ":{");
     if (uv.empty()) {
-        return nonstd::make_unexpected("Missing declaration after enum name.");
+        return std::unexpected("Missing declaration after enum name.");
     }
     auto rawName = sv.substr(0, sv.size() - uv.size());
     auto finalName = ExtractIdentifier(rawName);
     if (!finalName) {
-        return nonstd::make_unexpected(fmt::format("Invalid enum name: {}", Trim(rawName)));
+        return std::unexpected(fmt::format("Invalid enum name: {}", Trim(rawName)));
     }
     if (uv.front() == ':') {
         uv = EatWhileNot(uv, "{");
         if (uv.empty()) {
-            return nonstd::make_unexpected("Missing declaration after enum name.");
+            return std::unexpected("Missing declaration after enum name.");
         }
     } else {
         assert(uv.front() == '{');

@@ -1,5 +1,5 @@
-// needs: <string_view>, <nonstd/expected.hpp>, <utility>, <string>
-nonstd::expected<std::pair<std::string, std::string>, std::string> ParseStructClassDeclaration(
+// needs: <string_view>, <expected>, <utility>, <string>
+std::expected<std::pair<std::string, std::string>, std::string> ParseStructClassDeclaration(
     std::string_view sv)
 // needs: EatBlank, Trim, ExtractIdentifier, CompactSpaces
 {
@@ -8,7 +8,7 @@ nonstd::expected<std::pair<std::string, std::string>, std::string> ParseStructCl
     auto sv0 = EatBlank(sv);
     auto firstOpeningCurlyBracket = sv0.find('{');
     if (firstOpeningCurlyBracket == std::string_view::npos) {
-        return nonstd::make_unexpected("Can't find first opening curly bracket.");
+        return std::unexpected("Can't find first opening curly bracket.");
     }
     auto firstColon = sv0.find(':');
     auto nameFinalEndPos =
@@ -27,7 +27,7 @@ nonstd::expected<std::pair<std::string, std::string>, std::string> ParseStructCl
         finalName = ExtractIdentifier(tv.substr(i));
 
         if (!finalName) {
-            return nonstd::make_unexpected("Can't find struct/class name");
+            return std::unexpected("Can't find struct/class name");
         }
         if (finalName != "final") {
             break;

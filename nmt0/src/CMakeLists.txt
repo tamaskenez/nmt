@@ -5,7 +5,6 @@ add_executable(nmt0 ${sources})
 target_link_libraries(nmt0 PRIVATE
 	fmt::fmt
 	glog::glog
-	nonstd::expected-lite
 )
 
 install(TARGETS nmt0
