@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "fn_ReadFile.h"
 
 #include <fstream>

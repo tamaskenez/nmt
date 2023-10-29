@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "fn_ParseStructClassDeclaration.h"
 
 #include "fn_CompactSpaces.h"

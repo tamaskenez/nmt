@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "enum_EntityKind.h"
 #include "fn_EntityKindLongName.h"
 #include "fn_EntityKindOfStem.h"
@@ -12,15 +14,5 @@
 #include "fn_WriteFile.h"
 #include "fn_reinterpret_as_u8string_view.h"
 #include "sc_Entity.h"
-
-#include <fmt/std.h>
-#include <glog/logging.h>
-
-#include <algorithm>
-#include <cassert>
-#include <cstdlib>
-#include <iterator>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "../fn_main.h"

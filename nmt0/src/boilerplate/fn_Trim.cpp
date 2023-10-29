@@ -1,5 +1,5 @@
-#include "fn_Trim.h"
+#include "pch.h"
 
-#include <cctype>
+#include "fn_Trim.h"
 
 #include "../fn_Trim.h"
