@@ -1,7 +1,8 @@
-// needs: <string_view>
-std::string_view Trim(std::string_view sv)
-// needs: <cctype>
-{
+#include "pch.h"
+
+#include "Trim.h"
+
+std::string_view Trim(std::string_view sv) {
     while (!sv.empty() && isspace(sv.front())) {
         sv.remove_prefix(1);
     }

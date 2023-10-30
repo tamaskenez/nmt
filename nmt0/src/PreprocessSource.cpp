@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "PreprocessSource.h"
+#include "Trim.h"
 #include "TryEatSpecialComment.h"
 #include "parse.h"
 
@@ -13,7 +14,10 @@ std::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view
         if (currentNonComment) {
             auto size = sv.data() - *currentNonComment;
             CHECK(size >= 0);
-            nonCommentCode.push_back(std::string_view(*currentNonComment, size_t(size)));
+            auto ncc = Trim(std::string_view(*currentNonComment, size_t(size)));
+            if (!ncc.empty()) {
+                nonCommentCode.push_back(ncc);
+            }
             currentNonComment.reset();
         }
     };

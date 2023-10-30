@@ -81,7 +81,11 @@ std::expected<std::pair<SpecialComment, std::string_view>, std::string> TryEatSp
     if (!afterSlashSlash) {
         return std::unexpected(std::string());
     }
-    auto symbolAndRestOr = TryEatCSymbol(EatBlank(*afterSlashSlash));
+    auto afterPound = TryEatPrefix(EatBlank((*afterSlashSlash)), "#");
+    if (!afterPound) {
+        return std::unexpected(std::string());
+    }
+    auto symbolAndRestOr = TryEatCSymbol(*afterPound);
     if (!symbolAndRestOr) {
         return std::unexpected(std::string());
     }

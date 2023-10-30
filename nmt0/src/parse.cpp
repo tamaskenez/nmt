@@ -24,15 +24,15 @@ std::string_view EatWhileNot(std::string_view sv, std::string_view chs) {
 }
 
 std::optional<std::pair<std::string_view, std::string_view>> TryEatCSymbol(std::string_view sv) {
-    if (sv.empty() || !isalpha(sv.front())) {
+    if (sv.empty() || !(isalpha(sv.front()) || sv.front() == '_')) {
         return std::nullopt;
     }
     auto sv0 = sv;
     sv.remove_prefix(1);
-    while (!sv.empty() && (isalnum(sv.front() || sv.front() == '_'))) {
+    while (!sv.empty() && (isalnum(sv.front()) || sv.front() == '_')) {
         sv.remove_prefix(1);
     }
-    return std::make_pair(sv0.substr(0, sv.size() - sv0.size()), sv);
+    return std::make_pair(sv0.substr(0, sv0.size() - sv.size()), sv);
 }
 
 std::optional<std::string_view> TryEatPrefix(std::string_view sv, std::string_view prefix) {

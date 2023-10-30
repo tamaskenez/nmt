@@ -116,7 +116,20 @@ int main(int argc, char* argv[]) {
         auto ppsOr = PreprocessSource(source);
         if (!ppsOr) {
             fmt::print(stderr, "{} in {}", ppsOr.error(), sf);
+            return EXIT_FAILURE;
         }
+
+        for (auto ncc : ppsOr->nonCommentCode) {
+            fmt::print("--- BEGIN NCC--- \n{}\n--- END NCC ---\n\n", ncc);
+        }
+        for (auto& sc : ppsOr->specialComments) {
+            fmt::print("--- BEGIN SC `{}` ---\n", sc.keyword);
+            for (auto& x : sc.list) {
+                fmt::print("\t `{}`\n", x);
+            }
+            fmt::print("--- END SC `{}` ---\n", sc.keyword);
+        }
+        fmt::print("\n");
 
 #if 0
 
