@@ -1,7 +1,8 @@
-// needs: <optional>, <filesystem>, <string>
-std::optional<std::string> ReadFile(const std::filesystem::path& p)
-// needs: <fstream>
-{
+#include "pch.h"
+
+#include "ReadFile.h"
+
+std::optional<std::string> ReadFile(const std::filesystem::path& p) {
     std::ifstream f(p);
     if (!f.is_open()) {
         return std::nullopt;

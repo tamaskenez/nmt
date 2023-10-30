@@ -1,10 +1,7 @@
-// needs: <string_view>, <expected>, <utility>, <string>
+#include "parse.h"
+
 std::expected<std::pair<std::string, std::string>, std::string> ParseFunctionDeclaration(
-    std::string_view sv)
-// needs: EatBlank
-// needs: ExtractIdentifier, <fmt/std.h>, Trim
-// needs: CompactSpaces
-{
+    std::string_view sv) {
     // - Find the identifier before the first `(`, that will be the name. Note that this will fail
     // if the return type contains parentheses which can happen.
     // - Find the first `{` for the entire declaration.

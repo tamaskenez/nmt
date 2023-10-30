@@ -1,8 +1,7 @@
-// needs: <string_view>, <expected>, <utility>, <string>
+#include "parse.h"
+
 std::expected<std::pair<std::string, std::string>, std::string> ParseStructClassDeclaration(
-    std::string_view sv)
-// needs: EatBlank, Trim, ExtractIdentifier, CompactSpaces
-{
+    std::string_view sv) {
     // - Find the first `{` or `:`, whichever is earlier
     // - before that it's <NAME>(final)?
     auto sv0 = EatBlank(sv);

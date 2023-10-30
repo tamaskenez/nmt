@@ -1,5 +1,6 @@
 // needs: <filesystem>, <vector>
 struct Args {
-    std::vector<std::filesystem::path> sources, sourcesFiles;
+    bool verbose = false;
+    std::vector<std::filesystem::path> sources;
     std::filesystem::path outputDir;
 };

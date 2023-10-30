@@ -7,6 +7,7 @@ target_link_libraries(nmt0 PRIVATE
 	absl::log
 	absl::log_initialize
 	fmt::fmt
+	CLI11::CLI11
 )
 
 target_precompile_headers(nmt0 PRIVATE pch.h)
