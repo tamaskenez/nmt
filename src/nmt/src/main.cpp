@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "PreprocessSource.h"
-#include "enum_EntityKind.h"
+#include "enums.h"
 // #include "fn_EntityKindLongName.h"
 // #include "fn_EntityKindOfStem.h"
 // #include "fn_EntityKindShortName.h"
@@ -102,20 +102,93 @@ std::optional<EntityKind> StringToEntityKind(std::string_view sv) {
     return it->second;
 }
 
-enum class NeedsKind { forwardDeclaration, opaqueEnumDeclaration, definition, declaration };
-
-enum class Visibility { public_, target };
-
 struct EntityProperties {
     absl::flat_hash_map<NeedsKind, std::vector<std::string>> needsByKind;
     std::optional<std::string> namespace_;
     Visibility visibility = Visibility::target;
+
+    void Print() {
+        for (auto k : enum_traits<NeedsKind>::elements) {
+            auto it = needsByKind.find(k);
+            if (it == needsByKind.end()) {
+                continue;
+            }
+            fmt::print("needs for {}: {}\n", enum_name<NeedsKind>(k), fmt::join(it->second, ", "));
+        }
+        if (namespace_) {
+            fmt::print("namespace: {}\n", *namespace_);
+        }
+        fmt::print("visibility: {}\n", enum_name<Visibility>(visibility));
+    }
 };
 
-void ParsePreprocessedSource(const PreprocessedSource& pps) {
+std::expected<EntityProperties, std::string> ParsePreprocessedSource(
+    const PreprocessedSource& pps) {
+    EntityProperties ep;
     for (auto& sc : pps.specialComments) {
-                if(sc.keyword=="
+        auto keyword = enum_from_name<SpecialCommentKeyword>(sc.keyword);
+        if (!keyword) {
+            return std::unexpected(fmt::format("Invalid keyword: {}", sc.keyword));
+        }
+        bool gotVisibility = false;
+        auto addToNeeds = [&ep, &sc](NeedsKind k) {
+            auto& v = ep.needsByKind[k];
+            v.reserve(v.size() + sc.list.size());
+            for (auto& sv : sc.list) {
+                v.emplace_back(sv);
+            }
+        };
+        switch (*keyword) {
+            case SpecialCommentKeyword::fdneeds:
+                addToNeeds(NeedsKind::forwardDeclaration);
+                break;
+            case SpecialCommentKeyword::oedneeds:
+                addToNeeds(NeedsKind::opaqueEnumDeclaration);
+                break;
+            case SpecialCommentKeyword::needs:
+                addToNeeds(NeedsKind::declaration);
+                break;
+            case SpecialCommentKeyword::defneeds:
+                addToNeeds(NeedsKind::definition);
+                break;
+            case SpecialCommentKeyword::namespace_:
+                if (ep.namespace_) {
+                    return std::unexpected(
+                        fmt::format("Duplicated `#namespace`, first value: {}, second value: {}",
+                                    *ep.namespace_,
+                                    fmt::join(sc.list, ", ")));
+                }
+                if (sc.list.size() != 1) {
+                    return std::unexpected(fmt::format("`#namespace` need a single value, got: {}",
+                                                       fmt::join(sc.list, ", ")));
+                }
+                ep.namespace_ = sc.list.front();
+                break;
+            case SpecialCommentKeyword::visibility:
+                if (gotVisibility) {
+                    return std::unexpected(
+                        fmt::format("Duplicated `#visibility`, first value: {}, second value: {}",
+                                    enum_name<Visibility>(ep.visibility),
+                                    fmt::join(sc.list, ", ")));
+                }
+                if (sc.list.size() != 1) {
+                    return std::unexpected(fmt::format("`#visibility` need a single value, got: {}",
+                                                       fmt::join(sc.list, ", ")));
+                }
+                auto visibility = enum_from_name<Visibility>(sc.list.front());
+                if (!visibility) {
+                    return std::unexpected(
+                        fmt::format("Invalid `#visibility` value: {}", sc.list.front()));
+                }
+                ep.visibility = *visibility;
+                gotVisibility = true;
+                break;
+        }
     }
+    for (auto& [_, v] : ep.needsByKind) {
+        std::sort(v.begin(), v.end());
+    }
+    return ep;
 }
 
 int main(int argc, char* argv[]) {
@@ -142,7 +215,7 @@ int main(int argc, char* argv[]) {
 
     auto sourcesOr = ResolveArgsSources(args.sources, args.verbose);
     if (!sourcesOr) {
-                return EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
     auto sources = std::move(*sourcesOr);
 
@@ -153,35 +226,27 @@ int main(int argc, char* argv[]) {
     std::unordered_map<std::string, Entity> entities;
 
     for (auto& sf : args.sources) {
-                auto maybeSource = ReadFile(sf);
-                if (!maybeSource) {
-                    fmt::print(stderr, "Can't open file for reading: `{}`", sf);
-                    return EXIT_FAILURE;
-                }
-                auto& source = *maybeSource;
+        auto maybeSource = ReadFile(sf);
+        if (!maybeSource) {
+            fmt::print(stderr, "Can't open file for reading: `{}`", sf);
+            return EXIT_FAILURE;
+        }
+        auto& source = *maybeSource;
 
-                auto ppsOr = PreprocessSource(source);
-                if (!ppsOr) {
-                    fmt::print(stderr, "{} in {}", ppsOr.error(), sf);
-                    return EXIT_FAILURE;
-                }
+        auto ppsOr = PreprocessSource(source);
+        if (!ppsOr) {
+            fmt::print(stderr, "{} in {}", ppsOr.error(), sf);
+            return EXIT_FAILURE;
+        }
 
-                auto pppsOr = ParsePreprocessedSource(*ppsOr);
-
-                for (auto ncc : ppsOr->nonCommentCode) {
-                    fmt::print("--- BEGIN NCC--- \n{}\n--- END NCC ---\n\n", ncc);
-                }
-                for (auto& sc : ppsOr->specialComments) {
-                    fmt::print("--- BEGIN SC `{}` ---\n", sc.keyword);
-                    for (auto& x : sc.list) {
-                        fmt::print("\t `{}`\n", x);
-                    }
-                    fmt::print("--- END SC `{}` ---\n", sc.keyword);
-                }
-                fmt::print("\n");
-
-                [[maybe_unused]] auto& pps = *ppsOr;
-                fmt::print("\n");
+        auto epOr = ParsePreprocessedSource(*ppsOr);
+        if (!epOr) {
+            fmt::print(stderr, "Error: {}\n", epOr.error());
+            return EXIT_FAILURE;
+        }
+        auto& ep = *epOr;
+        ep.Print();
+        fmt::print("\n");
 
 #if 0
 

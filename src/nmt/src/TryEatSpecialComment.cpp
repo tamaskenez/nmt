@@ -1,19 +1,13 @@
 #include "pch.h"
 
 #include "TryEatSpecialComment.h"
+#include "enums.h"
 #include "parse.h"
 
 // Eats EOL, too.
-
-enum class SpecialCommentKeyword { fdneeds, oedneeds, needs, defneeds, namespace_, visibility };
-
-const static inline std::unordered_set<std::string_view> k_specialCommentKeywords = {
-    "fdneeds",   // forward-declaration needs
-    "oedneeds",  // opaque-enum-declaration needs
-    "needs",     // declaration needs
-    "defneeds",  // definition needs
-    "namespace",
-    "visibility"};
+const std::unordered_set<std::string_view> k_specialCommentKeywords(
+    enum_traits<SpecialCommentKeyword>::names.begin(),
+    enum_traits<SpecialCommentKeyword>::names.end());
 
 std::expected<std::pair<std::vector<std::string_view>, std::string_view>, std::string>
 TryEatCommaSeparatedListPossiblyMultiline(std::string_view sv) {

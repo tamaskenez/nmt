@@ -1,7 +1,6 @@
 #include "util/enum_traits.h"
 
 enum class ExampleEnum { A, B, C };
-
 template<>
 struct enum_traits<ExampleEnum> {
     using enum ExampleEnum;

@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <utility>
 
-// For usage, see util.cpp
+// For usage, see enum_traits.cpp
 
 template<typename Enum>
 struct enum_traits {};
@@ -24,14 +24,14 @@ constexpr bool is_enum_with_trivial_values() {
 };
 
 template<typename Enum>
-constexpr const char* enum_name(Enum e) noexcept {
+constexpr std::string_view enum_name(Enum e) noexcept {
     using Traits = enum_traits<Enum>;
     static_assert(Traits::elements.size() == Traits::names.size());
 
     size_t idx{};
 
     if constexpr (is_enum_with_trivial_values<Enum>()) {
-        idx = std::to_underlying(e);
+        idx = size_t(std::to_underlying(e));
     } else {
         auto it = std::find_if(Traits::elements.begin(), Traits::elements.end(), [e](Enum ei) {
             return ei == e;
@@ -39,7 +39,7 @@ constexpr const char* enum_name(Enum e) noexcept {
         ASSERT(it != Traits::elements.end());
         idx = it - Traits::elements.begin();
     }
-    ASSERT(0 <= idx && idx < Traits::names.size());
+    CHECK(0 <= idx && idx < Traits::names.size());
     return Traits::names[idx];
 }
 
@@ -49,8 +49,8 @@ constexpr std::optional<Enum> enum_from_name(std::string_view name) {
     for (auto it = Traits::names.begin(); it != Traits::names.end(); ++it) {
         if (*it == name) {
             auto idx = it - Traits::names.begin();
-            ASSERT(0 <= idx && idx < Traits::names.size());
-            return Traits::elements[idx];
+            CHECK(0 <= idx && std::cmp_less(idx, Traits::names.size()));
+            return Traits::elements[size_t(idx)];
         }
     }
     return std::nullopt;
