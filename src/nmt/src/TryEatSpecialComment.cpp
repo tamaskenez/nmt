@@ -5,6 +5,8 @@
 
 // Eats EOL, too.
 
+enum class SpecialCommentKeyword { fdneeds, oedneeds, needs, defneeds, namespace_, visibility };
+
 const static inline std::unordered_set<std::string_view> k_specialCommentKeywords = {
     "fdneeds",   // forward-declaration needs
     "oedneeds",  // opaque-enum-declaration needs

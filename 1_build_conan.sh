@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
-conan install conanfile.txt -b missing -pr:b default -if i/cmake -of i/cmake -s build_type=Debug -s os.version=13.0
-# conan install conanfile.txt -b missing -pr:b default -if i/cmake -of i/cmake -s build_type=Release
+conan install conanfile.txt -b missing -pr:b default -if id/cmake -of id/cmake -s build_type=Debug -s os.version=13.0
+# conan install conanfile.txt -b missing -pr:b default -if id/cmake -of id/cmake -s build_type=Release
 
 
 readonly qt6config=i/cmake/Qt6Config.cmake

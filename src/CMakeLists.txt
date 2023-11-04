@@ -1,7 +1,12 @@
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+add_subdirectory(util)
 
-add_subdirectory(nmt1)
-add_subdirectory(helloqt)
-add_subdirectory(common)
-add_subdirectory(nmtapp) # uses common
-add_subdirectory(qt)
+if(BUILD_NMT)
+	add_subdirectory(nmt)
+endif()
+
+if(BUILD_ALL)
+	add_subdirectory(helloqt)
+	add_subdirectory(common)
+	add_subdirectory(nmtapp) # uses common
+	add_subdirectory(qt)
+endif()
