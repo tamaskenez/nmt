@@ -1,7 +1,6 @@
 #include "parse.h"
 
-std::expected<std::pair<std::string, std::string>, std::string> ParseFunctionDeclaration(
-    std::string_view sv) {
+std::expected<std::pair<std::string, std::string>, std::string> ParseFunction(std::string_view sv) {
     // - Find the identifier before the first `(`, that will be the name. Note that this will fail
     // if the return type contains parentheses which can happen.
     // - Find the first `{` for the entire declaration.

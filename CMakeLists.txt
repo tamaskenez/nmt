@@ -5,7 +5,15 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED 1)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+message(STATUS "BUILD_TESTING: ${BUILD_TESTING}")
+
 include(build/RunNMT.cmake)
+
+if(BUILD_TESTING)
+	enable_testing()
+	find_package(GTest REQUIRED CONFIG)
+endif()
+
 
 find_package(absl REQUIRED)
 find_package(CLI11 REQUIRED)
@@ -28,5 +36,8 @@ if(BUILD_ALL)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(test)
+
+if(BUILD_TESTING)
+	add_subdirectory(test)
+endif()
 

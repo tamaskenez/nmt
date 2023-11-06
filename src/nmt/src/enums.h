@@ -1,4 +1,4 @@
-#include "util/enum_traits.h"
+#pragma once
 
 enum class EntityKind {
     enum_,
@@ -8,6 +8,14 @@ enum class EntityKind {
     using_,
     inlvar,
     memfn,
+};
+template<>
+struct enum_traits<EntityKind> {
+    using enum EntityKind;
+    static constexpr std::array<EntityKind, 7> elements{
+        enum_, fn, struct_, class_, using_, inlvar, memfn};
+    static constexpr std::array<std::string_view, elements.size()> names{
+        "enum", "fn", "struct", "class", "using", "inlvar", "memfn"};
 };
 
 enum class NeedsKind { forwardDeclaration, opaqueEnumDeclaration, definition, declaration };
@@ -28,13 +36,22 @@ struct enum_traits<Visibility> {
     static constexpr std::array<std::string_view, elements.size()> names{"public", "target"};
 };
 
-enum class SpecialCommentKeyword { fdneeds, oedneeds, needs, defneeds, namespace_, visibility };
+enum class SpecialCommentKeyword {
+    entity,
+    fdneeds,
+    oedneeds,
+    needs,
+    defneeds,
+    namespace_,
+    visibility
+};
 template<>
 struct enum_traits<SpecialCommentKeyword> {
     using enum SpecialCommentKeyword;
-    static constexpr std::array<SpecialCommentKeyword, 6> elements{
-        fdneeds, oedneeds, needs, defneeds, namespace_, visibility};
+    static constexpr std::array<SpecialCommentKeyword, 7> elements{
+        entity, fdneeds, oedneeds, needs, defneeds, namespace_, visibility};
     static constexpr std::array<std::string_view, elements.size()> names{
+        "entity",
         "fdneeds",   // forward-declaration needs
         "oedneeds",  // opaque-enum-declaration needs
         "needs",     // declaration needs

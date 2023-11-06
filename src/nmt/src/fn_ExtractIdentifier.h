@@ -1,7 +1,6 @@
-// needs: <string_view>, <optional>
-std::optional<std::string_view> ExtractIdentifier(std::string_view sv)
-// needs: Trim, <cctype>
-{
+#pragma once
+
+std::optional<std::string_view> ExtractIdentifier(std::string_view sv) {
     auto r = Trim(sv);
     if (r.empty()) {
         return std::nullopt;

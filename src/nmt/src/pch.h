@@ -1,10 +1,14 @@
 #pragma once
 
+#include "util/enum_traits.h"
+
+#include <absl/container/flat_hash_map.h>
 #include <absl/flags/flag.h>
 #include <absl/log/check.h>
 #include <absl/log/initialize.h>
 #include <absl/log/log.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/os.h>
 #include <fmt/std.h>
 #include "CLI/CLI.hpp"
 

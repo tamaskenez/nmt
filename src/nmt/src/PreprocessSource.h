@@ -1,10 +1,5 @@
 #pragma once
 
-#include "SpecialComment.h"
-
-struct PreprocessedSource {
-    std::vector<SpecialComment> specialComments;
-    std::vector<std::string_view> nonCommentCode;
-};
+#include "data.h"
 
 std::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv);

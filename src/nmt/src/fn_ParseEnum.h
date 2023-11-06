@@ -1,7 +1,4 @@
-#include "parse.h"
-
-std::expected<std::pair<std::string, std::string>, std::string> ParseOpaqueEnumDeclaration(
-    std::string_view sv) {
+std::expected<std::pair<std::string, std::string>, std::string> ParseEnum(std::string_view sv) {
     // Find the "opaque enum declaration" part of the source:
     //     enum(class|struct)?([[...]])?<NAME>(:<BASE>)?{
     auto sv0 = EatBlank(sv);

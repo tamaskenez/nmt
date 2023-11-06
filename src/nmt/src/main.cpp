@@ -1,21 +1,21 @@
 #include "pch.h"
 
+#include "parse.h"
+
 #include "PreprocessSource.h"
-#include "enums.h"
-// #include "fn_EntityKindLongName.h"
-// #include "fn_EntityKindOfStem.h"
-// #include "fn_EntityKindShortName.h"
-// #include "fn_ParseFunctionDeclaration.h"
-// #include "fn_ParseOpaqueEnumDeclaration.h"
-// #include "fn_ParseStructClassDeclaration.h"
 #include "ReadFile.h"
 #include "ReadFileAsLines.h"
+#include "Trim.h"
+#include "data.h"
+#include "fn_CompactSpaces.h"
+#include "fn_ExtractIdentifier.h"
+#include "fn_ParseEnum.h"
+#include "fn_ParseFn.h"
+#include "fn_ParseStructClass.h"
 // #include "fn_WriteFile.h"
 // #include "fn_fs_exists_total.h"
 // #include "fn_reinterpret_as_u8string_view.h"
-#include <absl/container/flat_hash_map.h>
 #include "sc_Args.h"
-#include "sc_Entity.h"
 
 namespace fs = std::filesystem;
 
@@ -102,43 +102,44 @@ std::optional<EntityKind> StringToEntityKind(std::string_view sv) {
     return it->second;
 }
 
-struct EntityProperties {
-    absl::flat_hash_map<NeedsKind, std::vector<std::string>> needsByKind;
-    std::optional<std::string> namespace_;
-    Visibility visibility = Visibility::target;
-
-    void Print() {
-        for (auto k : enum_traits<NeedsKind>::elements) {
-            auto it = needsByKind.find(k);
-            if (it == needsByKind.end()) {
-                continue;
-            }
-            fmt::print("needs for {}: {}\n", enum_name<NeedsKind>(k), fmt::join(it->second, ", "));
-        }
-        if (namespace_) {
-            fmt::print("namespace: {}\n", *namespace_);
-        }
-        fmt::print("visibility: {}\n", enum_name<Visibility>(visibility));
-    }
-};
-
 std::expected<EntityProperties, std::string> ParsePreprocessedSource(
     const PreprocessedSource& pps) {
-    EntityProperties ep;
+    struct {
+        std::optional<EntityKind> entityKind;
+        absl::flat_hash_map<NeedsKind, std::vector<std::string>> needsByKind;
+        std::optional<std::string> namespace_;
+        std::optional<Visibility> visibility;
+    } in;
     for (auto& sc : pps.specialComments) {
         auto keyword = enum_from_name<SpecialCommentKeyword>(sc.keyword);
         if (!keyword) {
             return std::unexpected(fmt::format("Invalid keyword: {}", sc.keyword));
         }
-        bool gotVisibility = false;
-        auto addToNeeds = [&ep, &sc](NeedsKind k) {
-            auto& v = ep.needsByKind[k];
+
+        auto addToNeeds = [&in, &sc](NeedsKind k) {
+            auto& v = in.needsByKind[k];
             v.reserve(v.size() + sc.list.size());
             for (auto& sv : sc.list) {
                 v.emplace_back(sv);
             }
         };
+
         switch (*keyword) {
+            case SpecialCommentKeyword::entity:
+                if (in.entityKind) {
+                    return std::unexpected(
+                        fmt::format("Duplicated `#entity`, first value: {}, second value: {}",
+                                    enum_name(*in.entityKind),
+                                    fmt::join(sc.list, ", ")));
+                }
+                if (sc.list.size() != 1) {
+                    return std::unexpected(fmt::format("`#entity` need a single value, got: {}",
+                                                       fmt::join(sc.list, ", ")));
+                }
+                in.entityKind = enum_from_name<EntityKind>(sc.list.front());
+                if (!in.entityKind) {
+                    return std::unexpected(fmt::format("Invalid `#entity`: {}", sc.list.front()));
+                }
             case SpecialCommentKeyword::fdneeds:
                 addToNeeds(NeedsKind::forwardDeclaration);
                 break;
@@ -152,43 +153,48 @@ std::expected<EntityProperties, std::string> ParsePreprocessedSource(
                 addToNeeds(NeedsKind::definition);
                 break;
             case SpecialCommentKeyword::namespace_:
-                if (ep.namespace_) {
-                    return std::unexpected(
-                        fmt::format("Duplicated `#namespace`, first value: {}, second value: {}",
-                                    *ep.namespace_,
-                                    fmt::join(sc.list, ", ")));
+                if (in.namespace_) {
+                    return std::unexpected(fmt::format("Duplicated `#namespace`, first value: {}, "
+                                                       "second value: {}",
+                                                       *in.namespace_,
+                                                       fmt::join(sc.list, ", ")));
                 }
                 if (sc.list.size() != 1) {
                     return std::unexpected(fmt::format("`#namespace` need a single value, got: {}",
                                                        fmt::join(sc.list, ", ")));
                 }
-                ep.namespace_ = sc.list.front();
+                in.namespace_ = sc.list.front();
                 break;
             case SpecialCommentKeyword::visibility:
-                if (gotVisibility) {
-                    return std::unexpected(
-                        fmt::format("Duplicated `#visibility`, first value: {}, second value: {}",
-                                    enum_name<Visibility>(ep.visibility),
-                                    fmt::join(sc.list, ", ")));
+                if (in.visibility) {
+                    return std::unexpected(fmt::format("Duplicated `#visibility`, first value: "
+                                                       "{}, second value: {}",
+                                                       enum_name<Visibility>(*in.visibility),
+                                                       fmt::join(sc.list, ", ")));
                 }
                 if (sc.list.size() != 1) {
                     return std::unexpected(fmt::format("`#visibility` need a single value, got: {}",
                                                        fmt::join(sc.list, ", ")));
                 }
-                auto visibility = enum_from_name<Visibility>(sc.list.front());
-                if (!visibility) {
+                in.visibility = enum_from_name<Visibility>(sc.list.front());
+                if (!in.visibility) {
                     return std::unexpected(
                         fmt::format("Invalid `#visibility` value: {}", sc.list.front()));
                 }
-                ep.visibility = *visibility;
-                gotVisibility = true;
                 break;
         }
     }
-    for (auto& [_, v] : ep.needsByKind) {
+    if (!in.entityKind) {
+        return std::unexpected("Missing `#entity`");
+    }
+    for (auto& [_, v] : in.needsByKind) {
         std::sort(v.begin(), v.end());
     }
-    return ep;
+    return EntityProperties{
+        .entityKind = *in.entityKind,
+        .needsByKind = std::move(in.needsByKind),
+        .namespace_ = std::move(in.namespace_),
+        .visibility = in.visibility.value_or(EntityProperties::k_defaultVisibility)};
 }
 
 int main(int argc, char* argv[]) {
@@ -221,8 +227,6 @@ int main(int argc, char* argv[]) {
 
     fmt::print("sources: {}\n", fmt::join(sources, ", "));
 
-    int result = EXIT_SUCCESS;
-
     std::unordered_map<std::string, Entity> entities;
 
     for (auto& sf : args.sources) {
@@ -239,6 +243,14 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
+        const bool hasSpecialComments = !ppsOr->specialComments.empty();
+        if (!hasSpecialComments) {
+            if (args.verbose) {
+                fmt::print(stderr, "Ignoring file without special comments: {}\n", sf);
+            }
+            continue;
+        }
+
         auto epOr = ParsePreprocessedSource(*ppsOr);
         if (!epOr) {
             fmt::print(stderr, "Error: {}\n", epOr.error());
@@ -246,58 +258,94 @@ int main(int argc, char* argv[]) {
         }
         auto& ep = *epOr;
         ep.Print();
-        fmt::print("\n");
+
+        // Find the first nonCommentCode after the first specialComment.
+        CHECK(hasSpecialComments);
+        auto& firstSpecialComment = ppsOr->specialComments.begin()->keyword;
+        auto it = ppsOr->nonCommentCode.begin();
+        while (it != ppsOr->nonCommentCode.end() && it->data() < firstSpecialComment.data()) {
+            ++it;
+        }
+        if (it == ppsOr->nonCommentCode.end()) {
+            // All nonCommentCode is before the first specialComment.
+            fprintf(stderr,
+                    "All code is before the first special comment. Move at leat the first special "
+                    "comment before the main entity in the file.\n");
+            return EXIT_FAILURE;
+        }
+        // Assemble all the remaining code into a single string.
+        std::string code;
+        for (; it != ppsOr->nonCommentCode.end(); ++it) {
+            code += *it;
+            code += ' ';
+        }
+
+        auto f = [&ep, &sf, &entities](
+                     std::expected<std::pair<std::string, std::string>, std::string> edOr)
+            -> std::expected<std::monostate, std::string> {
+            if (!edOr) {
+                return std::unexpected(fmt::format("Failed to parse {} in {}, reason: {}",
+                                                   enum_name(ep.entityKind),
+                                                   sf,
+                                                   edOr.error()));
+            }
+            auto entity = Entity{.name = edOr->first,
+                                 .path = sf,
+                                 .props = std::move(ep),
+                                 .lightDeclaration = std::move(edOr->second)};
+            auto itb = entities.insert(std::make_pair(std::move(edOr->first), std::move(entity)));
+            if (!itb.second) {
+                return std::unexpected(fmt::format("Duplicate name: `{}`, first {} then {}.",
+                                                   entity.name,
+                                                   enum_name(itb.first->second.props.entityKind),
+                                                   enum_name(entity.props.entityKind)));
+            }
+            return std::monostate{};
+        };
+
+        switch (ep.entityKind) {
+            case EntityKind::enum_: {
+                if (auto r = f(ParseEnum(code)); !r) {
+                    fmt::print(stderr, "Failed to parse {}, reason: {}\n", sf, r.error());
+                    return EXIT_FAILURE;
+                }
+            } break;
+            case EntityKind::fn:
+                // #define TRYQ(EXPECTED) if(auto x = (EXPECTED); !x.has_value()) { return
+                // std::unexpected(x); } TRYQ(f(ParseFunction(code)));
+                if (auto r = f(ParseFunction(code)); !r) {
+                    return EXIT_FAILURE;  // std::unexpected(r.error());
+                }
+                break;
+            case EntityKind::struct_:
+                break;
+            case EntityKind::class_:
+                break;
+            case EntityKind::using_:
+                break;
+            case EntityKind::inlvar:
+                break;
+            case EntityKind::memfn:
+                break;
+        }
+        /*
+switch (ep.entityKind) {
+    case EntityKind::enum_:
+//                f(ParseEnum(ppsOr->), EntityKind::enum_);
+        break;
+    case EntityKind::fn:
+//              f(ParseFunctionDeclaration(ppsOr->ppSource), EntityKind::fn);
+        break;
+    case EntityKind::sc:
+//            f(ParseStructClassDeclaration(ppsOr->ppSource), EntityKind::sc);
+        break;
+}
+         */
+    }
 
 #if 0
 
-        auto kind = EntityKindOfStem(sf.stem().string());
-        LOG_IF(FATAL, !kind) << fmt::format(
-            "Source file name `{}` is not prefixed by Entitykind (in file `{}`)",
-            sf.filename(),
-            sf);
-
-        std::vector<std::string> declNeeds, defNeeds;
-        for (auto& sc : ppsOr->specialComments) {
-            auto& v = sc.posInPPSource <= 0 ? declNeeds : defNeeds;
-            v.insert(v.end(),
-                     std::make_move_iterator(sc.needs.begin()),
-                     std::make_move_iterator(sc.needs.end()));
-        }
-
-        auto f = [&declNeeds, &defNeeds, &sf, &entities](
-                     std::expected<std::pair<std::string, std::string>, std::string> edOr,
-                     EntityKind kind) {
-            LOG_IF(FATAL, !edOr) << fmt::format("Can't parse {}: int file `{}`, reason: {}",
-                                                EntityKindLongName(kind),
-                                                sf,
-                                                edOr.error());
-            auto entity = Entity{.kind = kind,
-                                 .name = edOr->first,
-                                 .lightDeclaration = std::move(edOr->second),
-                                 .path = sf,
-                                 .declNeeds = std::move(declNeeds),
-                                 .defNeeds = std::move(defNeeds)};
-            auto itb = entities.insert(std::make_pair(std::move(edOr->first), std::move(entity)));
-            LOG_IF(FATAL, !itb.second) << fmt::format("Duplicate name: `{}`, first {} then {}.",
-                                                      entity.name,
-                                                      EntityKindLongName(itb.first->second.kind),
-                                                      EntityKindLongName(kind));
-        };
-
-        switch (*kind) {
-            case EntityKind::enum_:
-                f(ParseOpaqueEnumDeclaration(ppsOr->ppSource), EntityKind::enum_);
-                break;
-            case EntityKind::fn:
-                f(ParseFunctionDeclaration(ppsOr->ppSource), EntityKind::fn);
-                break;
-            case EntityKind::sc:
-                f(ParseStructClassDeclaration(ppsOr->ppSource), EntityKind::sc);
-                break;
-        }
-    }
-
-    std::error_code ec;
+	std::error_code ec;
     fs::create_directories(args.outputDir, ec);
     LOG_IF(FATAL, ec) << fmt::format("Can't create output directory `{}`.", args.outputDir);
 
@@ -427,7 +475,6 @@ int main(int argc, char* argv[]) {
             return additionalNeeds;
         }
 #endif
-    }
 #if 0
     for (auto& [_, e] : entities) {
         std::string headerContent = fmt::format("{}\n#pragma once\n", k_autogeneratedWarningLine);
@@ -515,5 +562,5 @@ int main(int argc, char* argv[]) {
     }
 
 #endif
-    return result;
+    return EXIT_SUCCESS;
 }

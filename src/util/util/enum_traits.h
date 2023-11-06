@@ -1,5 +1,7 @@
 #pragma once
 
+#include <absl/log/check.h>
+
 #include <algorithm>
 #include <array>
 #include <optional>

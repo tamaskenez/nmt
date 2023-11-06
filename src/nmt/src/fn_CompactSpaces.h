@@ -1,7 +1,6 @@
-// needs: <string_view>, <string>
-std::string CompactSpaces(std::string_view sv)
-// needs: <cctype>, <cassert>, Trim
-{
+#pragma once
+
+std::string CompactSpaces(std::string_view sv) {
     sv = Trim(sv);
     std::string r;
     r.reserve(sv.size());
