@@ -28,6 +28,8 @@ struct enum_traits<NeedsKind> {
         "forwardDeclaration", "opaqueEnumDeclaration", "definition", "declaration"};
 };
 
+NeedsKind NeedsKindForLightDeclaration(EntityKind ek);
+
 enum class Visibility { public_, target };
 template<>
 struct enum_traits<Visibility> {

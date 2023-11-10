@@ -2,6 +2,18 @@
 
 #include "enums.h"
 
+#ifdef NDEBUG
+template<class K, class V, class H = absl::flat_hash_map<K, V>::hasher>
+using flat_hash_map = absl::flat_hash_map<K, V, H>;
+template<class K,
+         class H = absl::flat_hash_set<K>::hasher using flat_hash_set = absl::flat_hash_set<K, H>;
+#else
+template<class K, class V, class H = std::unordered_map<K, V>::hasher>
+using flat_hash_map = std::unordered_map<K, V, H>;
+template<class K, class H = std::unordered_set<K>::hasher>
+using flat_hash_set = std::unordered_set<K, H>;
+#endif
+
 struct SpecialComment {
     std::string_view keyword;
     std::vector<std::string_view> list;
@@ -15,7 +27,7 @@ struct EntityProperties {
     static constexpr Visibility k_defaultVisibility = Visibility::target;
 
     EntityKind entityKind;  // No default value.
-    absl::flat_hash_map<NeedsKind, std::vector<std::string>> needsByKind;
+    flat_hash_map<NeedsKind, std::vector<std::string>> needsByKind;
     std::optional<std::string> namespace_;
     Visibility visibility = Visibility::target;
 

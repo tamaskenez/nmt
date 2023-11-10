@@ -2,6 +2,7 @@
 
 #include <absl/log/log.h>
 
+#include <concepts>
 #include <expected>
 #include <optional>
 #include <type_traits>
@@ -28,22 +29,23 @@
 //
 // 1. `try void_or_error()`
 //
-//     OR_RETHROW(void_or_error()); // if error, return std::unexpected(void_or_error().error());
+//     TRY(void_or_error()); // if error, return std::unexpected(void_or_error().error());
 //
 // 2. `let a = try something_or_unexpexted()`
 //
-//     ASSIGN_OR_RETHROW(x, something_or_unexpexted());
+//     TRY_ASSIGN(x, something_or_unexpected());
 //
 // is equivalent to `return std::unexpected(something_or_unexpexted().error())` on error, or
 // `auto x = *something_or_unexpexted(); // on success.
 //
 // 3. `try! void_or_error()`
-//
-//     OR_FATAL(void_or_error()); // equivalent to `LOG(FATAL) << void_or_error();` on error
-//
 // 4. `let a = try! something_or_unexpexted()`
 //
-//     ASSIGN_OR_FATAL(x, something_or_unexpexted());
+//     TRY_OR_FATAL(void_or_error());
+//
+// equivalent to `LOG(FATAL) << void_or_error();` on error
+//
+//     auto a = TRY_OR_FATAL(something_or_unexpexted());
 //
 // on error, it's equivalent to
 //
@@ -57,12 +59,12 @@
 // 6. `let a = try? something_or_unexpexted()`
 //
 //     to_optional(void_or_error())
-//     auto x= to_optional(something_or_unexpexted());
+//     auto x = to_optional(something_or_unexpexted());
 
 #define UTIL_PP_CONCAT2(A, B) A##B
 #define UTIL_PP_CONCAT(A, B)  UTIL_PP_CONCAT2(A, B)
 
-#define OR_RETHROW2(EXPECTED, TMP_VAR, TMP_VAR_TYPE)                                            \
+#define _TRY_INTERNAL(EXPECTED, TMP_VAR, TMP_VAR_TYPE)                                          \
     do {                                                                                        \
         auto&& TMP_VAR = (EXPECTED);                                                            \
         static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                           \
@@ -75,18 +77,18 @@
         }                                                                                       \
     } while (false)
 
-#define OR_RETHROW(EXPECTED)                            \
-    OR_RETHROW2(EXPECTED,                               \
-                UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
-                UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
+#define TRY(EXPECTED)                                     \
+    _TRY_INTERNAL(EXPECTED,                               \
+                  UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
+                  UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
 
 // Expands to sequence of statements, if mistakenly using as an if branch:
 //
-//     if(...) ASSIGN_OR_RETHROW(a, b);
+//     if(...) TRY_ASSIGN(a, b);
 //
 // will result in compiler error because the internal variable will be not in scope for the
 // assignment.
-#define ASSIGN_OR_RETHROW2(X, EXPECTED, TMP_VAR, TMP_VAR_TYPE)                              \
+#define _TRY_ASSIGN_INTERNAL(X, EXPECTED, TMP_VAR, TMP_VAR_TYPE)                            \
     auto&& TMP_VAR = (EXPECTED);                                                            \
     static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                           \
     using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                                   \
@@ -99,53 +101,49 @@
     }                                                                                       \
     auto&& X = std::move(*TMP_VAR);
 
-#define ASSIGN_OR_RETHROW(X, EXPECTED)                         \
-    ASSIGN_OR_RETHROW2(X,                                      \
-                       EXPECTED,                               \
-                       UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
-                       UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
+#define TRY_ASSIGN(X, EXPECTED)                                  \
+    _TRY_ASSIGN_INTERNAL(X,                                      \
+                         EXPECTED,                               \
+                         UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
+                         UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
 
-#ifndef UTIL_ERROR_ENABLE_IF_TESTING
-#    define UTIL_ERROR_ENABLE_IF_TESTING(X)
+#ifndef _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL
+#    define _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(X)
 #endif
 
 namespace detail {
 template<class T, class E>
 void or_fatal(std::expected<T, E>&& e) {
     const bool panic = !e.has_value();
-    UTIL_ERROR_ENABLE_IF_TESTING(if (panic) { throw util_test_error(e.error()); })
+    _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(if (panic) { throw util_test_error(e.error()); })
     LOG_IF(FATAL, panic) << e.error();
 }
 }  // namespace detail
 
 // Not a macro, still full-caps to stand out like the rest.
 template<class E>
-void OR_FATAL(std::expected<std::monostate, E>&& e) {
+void TRY_OR_FATAL(std::expected<std::monostate, E>&& e) {
     detail::or_fatal(std::move(e));
 }
 
-// Expands to sequence of statements, if mistakenly using as an if branch:
-//
-//     if(...) ASSIGN_OR_RETHROW(a, b);
-//
-// will result in compiler error because the internal variable will be not in scope for the
-// assignment.
-#define ASSIGN_OR_FATAL2(X, EXPECTED, TMP_VAR, TMP_VAR_TYPE)                                \
-    auto&& TMP_VAR = (EXPECTED);                                                            \
-    static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                           \
-    using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                                   \
-    /* assert that it's std::expected<T, E> */                                              \
-    static_assert(                                                                          \
-        std::is_same_v<TMP_VAR_TYPE,                                                        \
-                       std::expected<TMP_VAR_TYPE::value_type, TMP_VAR_TYPE::error_type>>); \
-    detail::or_fatal(std::move(TMP_VAR));                                                   \
-    auto&& X = std::move(*TMP_VAR);
+template<class T, class E>
+void TRY_OR_FATAL(std::expected<T, E>&& e)
+requires std::same_as<T, std::monostate>
+{
+    const bool panic = !e.has_value();
+    _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(if (panic) { throw util_test_error(e.error()); })
+    LOG_IF(FATAL, panic) << e.error();
+}
 
-#define ASSIGN_OR_FATAL(X, EXPECTED)                         \
-    ASSIGN_OR_FATAL2(X,                                      \
-                     EXPECTED,                               \
-                     UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
-                     UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
+template<class T, class E>
+[[nodiscard]] T TRY_OR_FATAL(std::expected<T, E>&& e)
+requires(!std::same_as<T, std::monostate>)
+{
+    const bool panic = !e.has_value();
+    _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(if (panic) { throw util_test_error(e.error()); })
+    LOG_IF(FATAL, panic) << e.error();
+    return std::move(*e);
+}
 
 template<class T, class E>
 std::optional<T> to_optional(std::expected<T, E>&& e) {

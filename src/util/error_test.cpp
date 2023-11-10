@@ -2,7 +2,7 @@
 #include <string>
 #include <utility>
 
-#define UTIL_ERROR_ENABLE_IF_TESTING(X) X
+#define _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(X) X
 
 class util_test_error : public std::logic_error {
    public:
@@ -30,7 +30,7 @@ std::optional<StatementReached> statementReached;
 
 EXV exv_or_rethrow(bool ok) {
     statementReached = StatementReached::no;
-    OR_RETHROW(ok ? EXV() : EXV(std::unexpected(k_errorString)));
+    TRY(ok ? EXV() : EXV(std::unexpected(k_errorString)));
     statementReached = StatementReached::yes;
     return {};
 }
@@ -38,8 +38,7 @@ EXV exv_or_rethrow(bool ok) {
 EXI exi_or_rethrow(bool ok) {
     statementReached = StatementReached::no;
     auto value = std::make_unique<int>(k_okInt);
-    ASSIGN_OR_RETHROW(
-        x, ok ? EXI(std::in_place, std::move(value)) : EXI(std::unexpected(k_errorString)));
+    TRY_ASSIGN(x, ok ? EXI(std::in_place, std::move(value)) : EXI(std::unexpected(k_errorString)));
     static_assert(std::is_same_v<std::decay_t<decltype(x)>, value_type>);
     statementReached = StatementReached::yes;
     return x;
@@ -48,8 +47,8 @@ EXI exi_or_rethrow(bool ok) {
 value_type exi_assign_or_fatal(bool ok) {
     statementReached = StatementReached::no;
     auto value = std::make_unique<int>(k_okInt);
-    ASSIGN_OR_FATAL(
-        x, ok ? EXI(std::in_place, std::move(value)) : EXI(std::unexpected(k_errorString)));
+    auto x = TRY_OR_FATAL(ok ? EXI(std::in_place, std::move(value))
+                             : EXI(std::unexpected(k_errorString)));
     static_assert(std::is_same_v<std::decay_t<decltype(x)>, value_type>);
     statementReached = StatementReached::yes;
     return x;
@@ -57,13 +56,13 @@ value_type exi_assign_or_fatal(bool ok) {
 
 }  // namespace
 
-TEST(error, OR_RETHROW_ok) {
+TEST(error, TRY_ok) {
     statementReached.reset();
     ASSERT_TRUE(exv_or_rethrow(true).has_value());
     ASSERT_EQ(statementReached, StatementReached::yes);
 }
 
-TEST(error, OR_RETHROW_error) {
+TEST(error, TRY_error) {
     statementReached.reset();
     auto r = exv_or_rethrow(false);
     ASSERT_FALSE(r.has_value());
@@ -71,7 +70,7 @@ TEST(error, OR_RETHROW_error) {
     ASSERT_EQ(statementReached, StatementReached::no);
 }
 
-TEST(error, ASSIGN_OR_RETHROW_ok) {
+TEST(error, TRY_ASSIGN_ok) {
     statementReached.reset();
     auto r = exi_or_rethrow(true);
     ASSERT_TRUE(r.has_value());
@@ -79,7 +78,7 @@ TEST(error, ASSIGN_OR_RETHROW_ok) {
     ASSERT_EQ(statementReached, StatementReached::yes);
 }
 
-TEST(error, ASSIGN_OR_RETHROW_error) {
+TEST(error, TRY_ASSIGN_error) {
     statementReached.reset();
     auto r = exi_or_rethrow(false);
     ASSERT_FALSE(r.has_value());
@@ -88,15 +87,15 @@ TEST(error, ASSIGN_OR_RETHROW_error) {
 }
 
 void or_fatal_error_test() {
-    OR_FATAL(EXV(std::unexpected(k_errorString)));
+    TRY_OR_FATAL(EXV(std::unexpected(k_errorString)));
 }
 
-TEST(error, OR_FATAL_ok) {
-    OR_FATAL(EXV());
+TEST(error, void_TRY_OR_FATAL_ok) {
+    TRY_OR_FATAL(EXV());
     SUCCEED();
 }
 
-TEST(error, OR_FATAL_error) {
+TEST(error, void_TRY_OR_FATAL_error) {
     try {
         or_fatal_error_test();
         FAIL();
@@ -105,14 +104,14 @@ TEST(error, OR_FATAL_error) {
     }
 }
 
-TEST(error, ASSIGN_OR_FATAL_ok) {
+TEST(error, nonvoid_TRY_OR_FATAL_ok) {
     statementReached.reset();
     auto r = exi_assign_or_fatal(true);
     ASSERT_EQ(*r, k_okInt);
     ASSERT_EQ(statementReached, StatementReached::yes);
 }
 
-TEST(error, ASSIGN_OR_FATAL_error) {
+TEST(error, nonvoid_TRY_OR_FATAL_error) {
     try {
         statementReached.reset();
         exi_assign_or_fatal(false);
