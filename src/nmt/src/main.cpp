@@ -140,8 +140,8 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         }
     }
     if (!result.entityKindOrSub) {
-        return std::unexpected(fmt::format(
-            "Missing `#<entity>` ({})", fmt::join(enum_traits<EntityKindOrSub>::elements, ", ")));
+        return std::unexpected(fmt::format("Missing `#<entity>` ({})",
+                                           fmt::join(enum_traits<EntityKindOrSub>::names, ", ")));
     }
     //
     // Find the first nonCommentCode after the first specialComment.
@@ -163,92 +163,109 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         code += *it;
         code += ' ';
     }
+    auto decl = Trim(code);
+    if (decl.empty()) {
+        return std::unexpected(
+            fmt::format("No code found for `{}` entity.", enum_name(*result.entityKindOrSub)));
+    }
+    if (decl.back() != ';') {
+                return std::unexpected("Missing trailing semicolon at end of `{}` entity.",enum_name(*result.entityKindOrSub)));
+    }
     //
-    std::sort(BEGIN_END(result.fdneeds));
-    std::sort(BEGIN_END(result.needs));
-    std::sort(BEGIN_END(result.defneeds));
+    std::ranges::sort(result.fdneeds);
+    std::ranges::sort(result.needs);
+    std::ranges::sort(result.defneeds);
+    struct {
+                bool fdneeds{}, needs{}, defneeds{};
+    } allowed;
     std::optional<EntityDependentProperties::V> dependentProps;
     switch (*result.entityKindOrSub) {
-        case EntityKindOrSub::enum_:
-            if (!result.defneeds.empty()) {
-                return std::unexpected(fmt::format("Enums can't have defneeds, here we have: {}",
-                                                   fmt::join(result.defneeds, ", ")));
-            }
-            dependentProps.emplace(std::in_place_index<std::to_underlying(EntityKind::enum_)>,
-                                   EntityDependentProperties::Enum{
-                                       .opaqueEnumDeclarationNeeds = std::move(result.fdneeds),
-                                       .declarationNeeds = std::move(result.needs)});
-            break;
-        case EntityKindOrSub::fn:
-            if (!in.fdneeds.empty()) {
-                return std::unexpected(fmt::format("Functions can't have fdneeds, here we have: {}",
-                                                   fmt::join(in.fdneeds, ", ")));
-            }
-            dependentProps.emplace(
-                std::in_place_index<std::to_underlying(fn)>,
-                EntityDependentProperties::Fn{.declarationNeeds = std::move(in.needs),
-                                              .definitionNeeds = std::move(in.defneeds)});
-            break;
-        case EntityKind::struct_:
-            if (!in.defneeds.empty()) {
-                return std::unexpected(fmt::format("Structs can't have defneeds, here we have: {}",
-                                                   fmt::join(in.defneeds, ", ")));
-            }
-            dependentProps.emplace(std::in_place_index<std::to_underlying(struct_)>,
-                                   EntityDependentProperties::StructOrClass{
-                                       .forwardDeclarationNeeds = std::move(in.fdneeds),
-                                       .declarationNeeds = std::move(in.needs)});
-            break;
-        case EntityKind::class_:
-            if (!in.defneeds.empty()) {
-                return std::unexpected(fmt::format("Classes can't have defneeds, here we have {}",
-                                                   fmt::join(in.defneeds, ", ")));
-            }
-            dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
-                                   EntityDependentProperties::StructOrClass{
-                                       .forwardDeclarationNeeds = std::move(in.fdneeds),
-                                       .declarationNeeds = std::move(in.needs)});
-            break;
-        case EntityKind::using_: {
-            if (!in.fdneeds.empty()) {
-                return std::unexpected(
-                    fmt::format("\"using\" entities can't have fdneeds, here we have: {}",
-                                fmt::join(in.fdneeds, ", ")));
-            }
-            if (!in.defneeds.empty()) {
-                return std::unexpected(
-                    fmt::format("\"using\" entities can't have defneeds, here we have: {}",
-                                fmt::join(in.defneeds, ", ")));
-            }
-            auto decl = Trim(code);
-            if (decl.empty() || decl.back() != ';') {
-                return std::unexpected("Missing semicolon at end of `using` entity.");
-            }
-            dependentProps.emplace(
-                std::in_place_index<std::to_underlying(using_)>,
-                EntityDependentProperties::Using{.declaration = CompactSpaces(decl),
-                                                 .declarationNeeds = std::move(in.needs)});
-        } break;
-        case EntityKind::inlvar:
-            if (!in.fdneeds.empty()) {
-                return std::unexpected(
-                    fmt::format("\"inlvar\" entities can't have fdneeds, here we have: {}",
-                                fmt::join(in.fdneeds, ", ")));
-            }
-            if (!in.defneeds.empty()) {
-                return std::unexpected(
-                    fmt::format("\"inlvar\" entities can't have defneeds, here we have: {}",
-                                fmt::join(in.defneeds, ", ")));
-            }
-            dependentProps.emplace(
-                std::in_place_index<std::to_underlying(inlvar)>,
-                EntityDependentProperties::InlVar{.declarationNeeds = std::move(in.needs)});
-            break;
+                case EntityKindOrSub::enum_:
+                    allowed.fdneeds = true;
+                    allowed.needs = true;
+                    auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
+                    if (declUntilFirstOpeningBrace.empty()) {
+                        return std::unexpected("No `{` found in enum declaration.");
+                    }
+                    dependentProps.emplace(
+                        std::in_place_index<std::to_underlying(EntityKind::enum_)>,
+                        EntityDependentProperties::Enum{
+                            .opaqueEnumDeclaration = std::string(declUntilFirstOpeningBrace),
+                            .opaqueEnumDeclarationNeeds = std::move(result.fdneeds),
+                            .declarationNeeds = std::move(result.needs)});
+                    break;
+                case EntityKindOrSub::fn:
+                    allowed.needs = true;
+                    allowed.defneeds = true;
+                    auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
+                    if (declUntilFirstOpeningBrace.empty()) {
+                        return std::unexpected("No `{` found in function definition.");
+                    }
+                    dependentProps.emplace(
+                        std::in_place_index<std::to_underlying(EntityKind::fn)>,
+                        EntityDependentProperties::Fn{
+                            .declaration = std::string(declUntilFirstOpeningBrace),
+                            .declarationNeeds = std::move(result.needs),
+                            .definitionNeeds = std::move(result.defneeds)});
+                    break;
+                case EntityKindOrSub::struct_:
+                    allowed.fdneeds = true;
+                    allowed.needs = true;
+                    dependentProps.emplace(std::in_place_index<std::to_underlying(struct_)>,
+                                           EntityDependentProperties::StructOrClass{
+                                               .forwardDeclarationNeeds = std::move(result.fdneeds),
+                                               .declarationNeeds = std::move(result.needs)});
+                    break;
+                case EntityKindOrSub::class_:
+                    allowed.fdneeds = true;
+                    allowed.needs = true;
+                    dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
+                                           EntityDependentProperties::StructOrClass{
+                                               .forwardDeclarationNeeds = std::move(result.fdneeds),
+                                               .declarationNeeds = std::move(result.needs)});
+                    break;
+                case EntityKindOrSub::using_: {
+                    allowed.needs = true;
+                    dependentProps.emplace(std::in_place_index<std::to_underlying(using_)>,
+                                           EntityDependentProperties::Using{
+                                               .declaration = CompactSpaces(decl),
+                                               .declarationNeeds = std::move(result.needs)});
+                } break;
+                case EntityKindOrSub::inlvar:
+                    allowed.needs = true;
+                    dependentProps.emplace(std::in_place_index<std::to_underlying(inlvar)>,
+                                           EntityDependentProperties::InlVar{
+                                               .declarationNeeds = std::move(result.needs)});
+                    break;
+                case EntityKindOrSub::memfn:
+                    allowed.needs = true;
+                    allowed.defneeds = true;
+                    auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
+                    if (declUntilFirstOpeningBrace.empty()) {
+                        return std::unexpected("No `{` found in member function definition.");
+                    }
+                    // Also find ClassName::Function
+                    break;
     }
-    return EntityProperties{
-        .namespace_ = std::move(in.namespace_),
-        .visibility = in.visibility.value_or(EntityProperties::k_defaultVisibility),
-        .dependentProps = std::move(dependentProps.value())};
+    if (!allowed.fdneeds && !result.fdneeds.empty()) {
+                return std::unexpected(
+                    fmt::format("`{}` entities can't have fdneeds, here we have: {}",
+                                enum_name(*result.entityKindOrSub),
+                                fmt::join(result.fdneeds, ", ")));
+    }
+    if (!allowed.needs && !result.needs.empty()) {
+                return std::unexpected(
+                    fmt::format("`{}` entities can't have needs, here we have: {}",
+                                enum_name(*result.entityKindOrSub),
+                                fmt::join(result.needs, ", ")));
+    }
+    if (!allowed.defneeds && !result.defneeds.empty()) {
+                return std::unexpected(
+                    fmt::format("`{}` entities can't have defneeds, here we have: {}",
+                                enum_name(*result.entityKindOrSub),
+                                fmt::join(result.defneeds, ", ")));
+    }
+    return result;
 }
 
 std::expected<std::monostate, std::string> ProcessSource(
@@ -257,17 +274,17 @@ std::expected<std::monostate, std::string> ProcessSource(
     flat_hash_map<std::string, Entity>& entities) {
     auto maybeSource = ReadFile(sf);
     if (!maybeSource) {
-        return std::unexpected("Can't open file for reading");
+                return std::unexpected("Can't open file for reading");
     }
     auto& source = *maybeSource;
 
     TRY_ASSIGN(pps, PreprocessSource(source))
 
     if (pps.specialComments.empty()) {
-        if (args.verbose) {
-            fmt::print(stderr, "Ignoring file without special comments: {}\n", sf);
-        }
-        return {};
+                if (args.verbose) {
+                    fmt::print(stderr, "Ignoring file without special comments: {}\n", sf);
+                }
+                return {};
     }
 
     TRY_ASSIGN(ep, ParsePreprocessedSource(pps));
@@ -329,10 +346,11 @@ std::expected<std::monostate, std::string> ProcessSource(
     auto entity = Entity{.name = name, .path = sf, .props = std::move(ep)};
     auto itb = entities.insert(std::make_pair(std::move(name), std::move(entity)));
     if (!itb.second) {
-        return std::unexpected(fmt::format("Duplicate name: `{}`, first {} then {}.",
-                                           entity.name,
-                                           enum_name(itb.first->second.props.GetEntityKind()),
-                                           enum_name(entity.props.GetEntityKind())));
+                return std::unexpected(
+                    fmt::format("Duplicate name: `{}`, first {} then {}.",
+                                entity.name,
+                                enum_name(itb.first->second.props.GetEntityKind()),
+                                enum_name(entity.props.GetEntityKind())));
     }
     return std::monostate();
 }
@@ -361,7 +379,7 @@ int main(int argc, char* argv[]) {
 
     auto sourcesOr = ResolveArgsSources(args.sources, args.verbose);
     if (!sourcesOr) {
-        return EXIT_FAILURE;
+                return EXIT_FAILURE;
     }
     auto sources = std::move(*sourcesOr);
 
@@ -370,11 +388,11 @@ int main(int argc, char* argv[]) {
     flat_hash_map<std::string, Entity> entities;
 
     for (auto& sf : sources) {
-        auto r = ProcessSource(sf, args, entities);
-        if (!r) {
-            fmt::print(stderr, "Failed to process {}: {}\n", sf, r.error());
-            return EXIT_FAILURE;
-        }
+                auto r = ProcessSource(sf, args, entities);
+                if (!r) {
+                    fmt::print(stderr, "Failed to process {}: {}\n", sf, r.error());
+                    return EXIT_FAILURE;
+                }
     }
 
     std::error_code ec;
@@ -385,259 +403,265 @@ int main(int argc, char* argv[]) {
     LOG_IF(QFATAL, ec) << fmt::format("Can't get listing of output directory `{}`.",
                                       args.outputDir);
     struct path_hash {
-        size_t operator()(const fs::path p) const {
-            return hash_value(p);
-        }
+                size_t operator()(const fs::path p) const {
+                    return hash_value(p);
+                }
     };
     flat_hash_set<fs::path, path_hash> remainingExistingFiles;
     for (auto const& de : dit) {
-        auto ext = de.path().extension().string();
-        if (ext == ".h" || ext == ".cpp") {
-            remainingExistingFiles.insert(de.path());
-        }
+                auto ext = de.path().extension().string();
+                if (ext == ".h" || ext == ".cpp") {
+                    remainingExistingFiles.insert(de.path());
+                }
     }
     std::vector<fs::path> currentFiles;
 
     struct Includes {
-        std::vector<std::string> generateds, locals, externalsInDirs, externalWithExtension,
-            externalsWithoutExtension, forwardDeclarations;
-        void addHeader(std::string_view s) {
-            assert(!s.empty());
-            std::vector<std::string>* v{};
-            if (s[0] == '"') {
-                v = &locals;
-            } else if (s.find('/') != std::string_view::npos) {
-                v = &externalsInDirs;
-            } else if (s.find('.') != std::string_view::npos) {
-                v = &externalWithExtension;
-            } else {
-                v = &externalsWithoutExtension;
-            }
-            v->push_back(std::string(s));
-        };
-        std::string render() {
-            std::string content;
-            auto addHeaders = [&content](std::vector<std::string>& v) {
-                if (!v.empty()) {
-                    if (!content.empty()) {
-                        content += "\n";
-                    }
-                    std::sort(v.begin(), v.end());
-                    for (auto& s : v) {
-                        content += fmt::format("#include {}\n", s);
-                    }
-                }
-            };
-            addHeaders(generateds);
-            addHeaders(locals);
-            addHeaders(externalsInDirs);
-            addHeaders(externalWithExtension);
-            addHeaders(externalsWithoutExtension);
-            if (!forwardDeclarations.empty()) {
-                if (!content.empty()) {
-                    content += "\n";
-                }
-                std::sort(forwardDeclarations.begin(), forwardDeclarations.end());
-                for (auto& s : forwardDeclarations) {
-                    content += s;
-                }
-            }
-            return content;
-        }
-        void addNeedsAsHeaders(const flat_hash_map<std::string, Entity>& entities,
-                               const Entity& e,
-                               const std::vector<std::string>& needs,
-                               const fs::path& outputDir) {
-            std::vector<std::string> additionalNeeds;
-            const std::vector<std::string>* currentNeeds = &needs;
-            while (!currentNeeds->empty()) {
-                additionalNeeds = addNeedsAsHeadersCore(entities, e, *currentNeeds, outputDir);
-                // TODO: prevent infinite loop because of some circular dependency.
-                currentNeeds = &additionalNeeds;
-            }
-        }
-        // Return additional needs coming from the enums which have needs for their
-        // opaque-enum-declaration.
-        std::vector<std::string> addNeedsAsHeadersCore(
-            const flat_hash_map<std::string, Entity>& entities,
-            const Entity& e,
-            const std::vector<std::string>& needs,
-            const fs::path& outputDir) {
-            std::vector<std::string> additionalNeeds;
-            for (auto& need : needs) {
-                LOG_IF(FATAL, need.empty()) << "Empty need name.";
-                if (need[0] == '<' || need[0] == '"') {
-                    addHeader(need);
-                } else {
-                    std::string_view needName = need;
-                    const bool refOnly = needName.back() == '*';
-                    if (refOnly) {
-                        needName.remove_suffix(1);
-                    }
-                    LOG_IF(FATAL, needName == e.name)
-                        << fmt::format("Entity `{}` can't include itself.", e.name);
-                    auto it = entities.find(std::string(needName));  // TODO(optimize): could use
-                                                                     // heterogenous lookup.
-                    LOG_IF(FATAL, it == entities.end()) << fmt::format(
-                        "Entity `{}` needs `{}` but it's missing.", e.name, needName);
-                    auto& ne = it->second;
-                    switch (ne.props.GetEntityKind()) {
-                        case EntityKind::enum_:
-                        case EntityKind::struct_:
-                        case EntityKind::class_:
-                            break;
-                        case EntityKind::fn:
-                        case EntityKind::using_:
-                        case EntityKind::inlvar:
-                            break;
-                    }
-                    if (refOnly) {
-                        auto* v = ne.props.ForwardDeclarationNeedsOrNull();
-                        LOG_IF(FATAL, v == nullptr)
-                            << fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
-                                           "be forward declared.",
-                                           e.name,
-                                           need,
-                                           enum_name(ne.props.GetEntityKind()));
-                        additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
-                        forwardDeclarations.push_back(
-                            fmt::format("{};", ne.props.ForwardDeclaration()));
+                std::vector<std::string> generateds, locals, externalsInDirs, externalWithExtension,
+                    externalsWithoutExtension, forwardDeclarations;
+                void addHeader(std::string_view s) {
+                    assert(!s.empty());
+                    std::vector<std::string>* v{};
+                    if (s[0] == '"') {
+                        v = &locals;
+                    } else if (s.find('/') != std::string_view::npos) {
+                        v = &externalsInDirs;
+                    } else if (s.find('.') != std::string_view::npos) {
+                        v = &externalWithExtension;
                     } else {
-                        auto path =
-                            outputDir / fs::path(reinterpret_as_u8string_view(ne.HeaderFilename()));
-                        generateds.push_back(fmt::format("\"{}\"", path));
+                        v = &externalsWithoutExtension;
+                    }
+                    v->push_back(std::string(s));
+                };
+                std::string render() {
+                    std::string content;
+                    auto addHeaders = [&content](std::vector<std::string>& v) {
+                        if (!v.empty()) {
+                            if (!content.empty()) {
+                                content += "\n";
+                            }
+                            std::sort(v.begin(), v.end());
+                            for (auto& s : v) {
+                                content += fmt::format("#include {}\n", s);
+                            }
+                        }
+                    };
+                    addHeaders(generateds);
+                    addHeaders(locals);
+                    addHeaders(externalsInDirs);
+                    addHeaders(externalWithExtension);
+                    addHeaders(externalsWithoutExtension);
+                    if (!forwardDeclarations.empty()) {
+                        if (!content.empty()) {
+                            content += "\n";
+                        }
+                        std::sort(forwardDeclarations.begin(), forwardDeclarations.end());
+                        for (auto& s : forwardDeclarations) {
+                            content += s;
+                        }
+                    }
+                    return content;
+                }
+                void addNeedsAsHeaders(const flat_hash_map<std::string, Entity>& entities,
+                                       const Entity& e,
+                                       const std::vector<std::string>& needs,
+                                       const fs::path& outputDir) {
+                    std::vector<std::string> additionalNeeds;
+                    const std::vector<std::string>* currentNeeds = &needs;
+                    while (!currentNeeds->empty()) {
+                        additionalNeeds =
+                            addNeedsAsHeadersCore(entities, e, *currentNeeds, outputDir);
+                        // TODO: prevent infinite loop because of some circular dependency.
+                        currentNeeds = &additionalNeeds;
                     }
                 }
-            }
-            return additionalNeeds;
-        }
+                // Return additional needs coming from the enums which have needs for their
+                // opaque-enum-declaration.
+                std::vector<std::string> addNeedsAsHeadersCore(
+                    const flat_hash_map<std::string, Entity>& entities,
+                    const Entity& e,
+                    const std::vector<std::string>& needs,
+                    const fs::path& outputDir) {
+                    std::vector<std::string> additionalNeeds;
+                    for (auto& need : needs) {
+                        LOG_IF(FATAL, need.empty()) << "Empty need name.";
+                        if (need[0] == '<' || need[0] == '"') {
+                            addHeader(need);
+                        } else {
+                            std::string_view needName = need;
+                            const bool refOnly = needName.back() == '*';
+                            if (refOnly) {
+                                needName.remove_suffix(1);
+                            }
+                            LOG_IF(FATAL, needName == e.name)
+                                << fmt::format("Entity `{}` can't include itself.", e.name);
+                            auto it =
+                                entities.find(std::string(needName));  // TODO(optimize): could use
+                                                                       // heterogenous lookup.
+                            LOG_IF(FATAL, it == entities.end()) << fmt::format(
+                                "Entity `{}` needs `{}` but it's missing.", e.name, needName);
+                            auto& ne = it->second;
+                            switch (ne.props.GetEntityKind()) {
+                                case EntityKind::enum_:
+                                case EntityKind::struct_:
+                                case EntityKind::class_:
+                                    break;
+                                case EntityKind::fn:
+                                case EntityKind::using_:
+                                case EntityKind::inlvar:
+                                    break;
+                            }
+                            if (refOnly) {
+                                auto* v = ne.props.ForwardDeclarationNeedsOrNull();
+                                LOG_IF(FATAL, v == nullptr)
+                                    << fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
+                                                   "be forward declared.",
+                                                   e.name,
+                                                   need,
+                                                   enum_name(ne.props.GetEntityKind()));
+                                additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
+                                forwardDeclarations.push_back(
+                                    fmt::format("{};", ne.props.ForwardDeclaration()));
+                            } else {
+                                auto path =
+                                    outputDir
+                                    / fs::path(reinterpret_as_u8string_view(ne.HeaderFilename()));
+                                generateds.push_back(fmt::format("\"{}\"", path));
+                            }
+                        }
+                    }
+                    return additionalNeeds;
+                }
     };
 
     for (auto& [_, e] : entities) {
-        std::string headerContent = fmt::format("{}\n#pragma once\n", k_autogeneratedWarningLine);
-        {
-            Includes includes;
-            auto addNeedsAsHeaders =
-                [&includes, &args, &entities, &e](const std::vector<std::string>& needs) {
-                    includes.addNeedsAsHeaders(entities, e, needs, args.outputDir);
-                };
-            switch (e.props.GetEntityKind()) {
-                case EntityKind::enum_:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Enum>(e.props.dependentProps)
-                            .opaqueEnumDeclarationNeeds);
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Enum>(e.props.dependentProps)
-                            .declarationNeeds);
-                    break;
-                case EntityKind::fn:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Fn>(e.props.dependentProps)
-                            .declarationNeeds);
-                    break;
-                case EntityKind::struct_:
-                    addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::struct_)>(e.props.dependentProps)
-                            .forwardDeclarationNeeds);
-                    addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::struct_)>(e.props.dependentProps)
-                            .declarationNeeds);
-                    break;
-                case EntityKind::class_:
-                    addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::class_)>(e.props.dependentProps)
-                            .forwardDeclarationNeeds);
-                    addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::class_)>(e.props.dependentProps)
-                            .declarationNeeds);
-                    break;
-                case EntityKind::using_:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Using>(e.props.dependentProps)
-                            .declarationNeeds);
-                    break;
-                case EntityKind::inlvar:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::InlVar>(e.props.dependentProps)
-                            .declarationNeeds);
-                    break;
-            }
-            auto renderedHeaders = includes.render();
-            if (!renderedHeaders.empty()) {
-                headerContent += fmt::format("\n{}", renderedHeaders);
-            }
-        }
-        headerContent += "\n";
-        switch (e.props.GetEntityKind()) {
-            case EntityKind::enum_:
-            case EntityKind::using_:
-            case EntityKind::inlvar:
-                headerContent += fmt::format("#include \"{}\"\n", e.path);
-                break;
-            case EntityKind::fn:
-                headerContent += fmt::format(
-                    "{};\n",
-                    std::get<EntityDependentProperties::Fn>(e.props.dependentProps).declaration);
-                break;
-            case EntityKind::struct_:
-            case EntityKind::class_:
-                // TODO (not here) determine source files' relative dires and
-                // generate output files according to relative dirs.
-                headerContent += fmt::format(
-                    "#define {} \"{}\"\n#include \"{}\"\n#undef {}\n",
-                    k_nmtIncludeMemberDeclarationsMacro,
-                    args.outputDir
-                        / fs::path(reinterpret_as_u8string_view(e.MemberDeclarationsFilename())),
-                    e.path,
-                    k_nmtIncludeMemberDeclarationsMacro);
-                break;
-        }
-        fmt::print("Processed {} from {}\n", e.name, e.path);
-        auto headerPath = args.outputDir / e.HeaderFilename();
-        remainingExistingFiles.erase(headerPath);
-        currentFiles.push_back(headerPath);
-        auto existingHeaderContent = ReadFile(headerPath);
-        if (existingHeaderContent != headerContent) {
-            LOG_IF(FATAL, !WriteFile(headerPath, headerContent))
-                << fmt::format("Couldn't write {}.", headerPath);
-        }  // Else no change, no need to write.
-
-        std::string cppContent =
-            fmt::format("{}\n#include \"{}\"\n", k_autogeneratedWarningLine, headerPath);
-        switch_variant(
-            e.props.dependentProps,
-            [&args, &entities, &cppContent, &e](const EntityDependentProperties::Fn& dp) {
-                Includes includes;
-                includes.addNeedsAsHeaders(entities, e, dp.definitionNeeds, args.outputDir);
-                auto renderedHeaders = includes.render();
-                if (!renderedHeaders.empty()) {
-                    cppContent += fmt::format("\n{}", renderedHeaders);
+                std::string headerContent =
+                    fmt::format("{}\n#pragma once\n", k_autogeneratedWarningLine);
+                {
+                    Includes includes;
+                    auto addNeedsAsHeaders =
+                        [&includes, &args, &entities, &e](const std::vector<std::string>& needs) {
+                            includes.addNeedsAsHeaders(entities, e, needs, args.outputDir);
+                        };
+                    switch (e.props.GetEntityKind()) {
+                        case EntityKind::enum_:
+                            addNeedsAsHeaders(
+                                std::get<EntityDependentProperties::Enum>(e.props.dependentProps)
+                                    .opaqueEnumDeclarationNeeds);
+                            addNeedsAsHeaders(
+                                std::get<EntityDependentProperties::Enum>(e.props.dependentProps)
+                                    .declarationNeeds);
+                            break;
+                        case EntityKind::fn:
+                            addNeedsAsHeaders(
+                                std::get<EntityDependentProperties::Fn>(e.props.dependentProps)
+                                    .declarationNeeds);
+                            break;
+                        case EntityKind::struct_:
+                            addNeedsAsHeaders(std::get<std::to_underlying(EntityKind::struct_)>(
+                                                  e.props.dependentProps)
+                                                  .forwardDeclarationNeeds);
+                            addNeedsAsHeaders(std::get<std::to_underlying(EntityKind::struct_)>(
+                                                  e.props.dependentProps)
+                                                  .declarationNeeds);
+                            break;
+                        case EntityKind::class_:
+                            addNeedsAsHeaders(std::get<std::to_underlying(EntityKind::class_)>(
+                                                  e.props.dependentProps)
+                                                  .forwardDeclarationNeeds);
+                            addNeedsAsHeaders(std::get<std::to_underlying(EntityKind::class_)>(
+                                                  e.props.dependentProps)
+                                                  .declarationNeeds);
+                            break;
+                        case EntityKind::using_:
+                            addNeedsAsHeaders(
+                                std::get<EntityDependentProperties::Using>(e.props.dependentProps)
+                                    .declarationNeeds);
+                            break;
+                        case EntityKind::inlvar:
+                            addNeedsAsHeaders(
+                                std::get<EntityDependentProperties::InlVar>(e.props.dependentProps)
+                                    .declarationNeeds);
+                            break;
+                    }
+                    auto renderedHeaders = includes.render();
+                    if (!renderedHeaders.empty()) {
+                        headerContent += fmt::format("\n{}", renderedHeaders);
+                    }
                 }
-            },
-            [](auto&&) {});
-        cppContent += fmt::format("\n#include \"{}\"\n", e.path);
-        auto cppPath = args.outputDir / e.DefinitionFilename();
-        remainingExistingFiles.erase(cppPath);
-        currentFiles.push_back(cppPath);
-        auto existingCppContent = ReadFile(cppPath);
-        if (existingCppContent != cppContent) {
-            LOG_IF(FATAL, !WriteFile(cppPath, cppContent))
-                << fmt::format("Couldn't write {}.", cppPath);
-        }  // Else no change, no need to write.
-    }      // for a: entities
+                headerContent += "\n";
+                switch (e.props.GetEntityKind()) {
+                    case EntityKind::enum_:
+                    case EntityKind::using_:
+                    case EntityKind::inlvar:
+                        headerContent += fmt::format("#include \"{}\"\n", e.path);
+                        break;
+                    case EntityKind::fn:
+                        headerContent += fmt::format(
+                            "{};\n",
+                            std::get<EntityDependentProperties::Fn>(e.props.dependentProps)
+                                .declaration);
+                        break;
+                    case EntityKind::struct_:
+                    case EntityKind::class_:
+                        // TODO (not here) determine source files' relative dires and
+                        // generate output files according to relative dirs.
+                        headerContent += fmt::format(
+                            "#define {} \"{}\"\n#include \"{}\"\n#undef {}\n",
+                            k_nmtIncludeMemberDeclarationsMacro,
+                            args.outputDir
+                                / fs::path(
+                                    reinterpret_as_u8string_view(e.MemberDeclarationsFilename())),
+                            e.path,
+                            k_nmtIncludeMemberDeclarationsMacro);
+                        break;
+                }
+                fmt::print("Processed {} from {}\n", e.name, e.path);
+                auto headerPath = args.outputDir / e.HeaderFilename();
+                remainingExistingFiles.erase(headerPath);
+                currentFiles.push_back(headerPath);
+                auto existingHeaderContent = ReadFile(headerPath);
+                if (existingHeaderContent != headerContent) {
+                    LOG_IF(FATAL, !WriteFile(headerPath, headerContent))
+                        << fmt::format("Couldn't write {}.", headerPath);
+                }  // Else no change, no need to write.
+
+                std::string cppContent =
+                    fmt::format("{}\n#include \"{}\"\n", k_autogeneratedWarningLine, headerPath);
+                switch_variant(
+                    e.props.dependentProps,
+                    [&args, &entities, &cppContent, &e](const EntityDependentProperties::Fn& dp) {
+                        Includes includes;
+                        includes.addNeedsAsHeaders(entities, e, dp.definitionNeeds, args.outputDir);
+                        auto renderedHeaders = includes.render();
+                        if (!renderedHeaders.empty()) {
+                            cppContent += fmt::format("\n{}", renderedHeaders);
+                        }
+                    },
+                    [](auto&&) {});
+                cppContent += fmt::format("\n#include \"{}\"\n", e.path);
+                auto cppPath = args.outputDir / e.DefinitionFilename();
+                remainingExistingFiles.erase(cppPath);
+                currentFiles.push_back(cppPath);
+                auto existingCppContent = ReadFile(cppPath);
+                if (existingCppContent != cppContent) {
+                    LOG_IF(FATAL, !WriteFile(cppPath, cppContent))
+                        << fmt::format("Couldn't write {}.", cppPath);
+                }  // Else no change, no need to write.
+    }              // for a: entities
     for (auto& f : remainingExistingFiles) {
-        fs::remove(f, ec);  // Ignore if couldn't remove it.
+                fs::remove(f, ec);  // Ignore if couldn't remove it.
     }
     std::string fileListContent;
     std::sort(currentFiles.begin(), currentFiles.end());
     for (auto& c : currentFiles) {
-        fileListContent += fmt::format("{}\n", c);
+                fileListContent += fmt::format("{}\n", c);
     }
     auto filesPath = args.outputDir / "files.txt";
     auto existingFileListContent = ReadFile(filesPath);
     if (existingFileListContent != fileListContent) {
-        LOG_IF(FATAL, !WriteFile(filesPath, fileListContent))
-            << fmt::format("Could write file list: {}.", filesPath);
+                LOG_IF(FATAL, !WriteFile(filesPath, fileListContent))
+                    << fmt::format("Could write file list: {}.", filesPath);
     }
     return EXIT_SUCCESS;
 }
