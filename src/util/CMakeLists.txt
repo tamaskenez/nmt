@@ -8,15 +8,13 @@ target_include_directories(util
 target_link_libraries(util PUBLIC absl::log)
 
 if(BUILD_TESTING)
-
-file(GLOB_RECURSE test_sources CONFIGURE_DEPENDS *_test.cpp)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${test_sources})
-add_executable(test_util ${test_sources})
-target_link_libraries(test_util PRIVATE
-	util
-	GTest::gtest
-	GTest::gtest_main
-)
-add_test(NAME test_util COMMAND test_util)
-
+	file(GLOB_RECURSE test_sources CONFIGURE_DEPENDS *_test.cpp)
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${test_sources})
+	add_executable(test_util ${test_sources})
+	target_link_libraries(test_util PRIVATE
+		util
+		GTest::gtest
+		GTest::gtest_main
+	)
+	add_test(NAME test_util COMMAND test_util)
 endif()

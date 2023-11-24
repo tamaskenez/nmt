@@ -68,7 +68,8 @@ std::optional<Enum> from_underlying(std::underlying_type_t<Enum> x) {
     using Traits = enum_traits<Enum>;
 
     if constexpr (is_enum_with_trivial_values<Enum>()) {
-        return 0 <= x && x < Traits::elements.size() ? std::make_optional(Enum(x)) : std::nullopt;
+        return 0 <= x && std::cmp_less(x, Traits::elements.size()) ? std::make_optional(Enum(x))
+                                                                   : std::nullopt;
     }
 
     auto it = std::find_if(Traits::elements.begin(), Traits::elements.end(), [x](Enum e) {

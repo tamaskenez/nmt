@@ -50,6 +50,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "C
     -Wswitch-enum        # A switch statement has an index of enumerated type and lacks a case.
     -Wundef              # An undefined identifier is evaluated in an #if directive.
     -Wunused             # Enable all -Wunused- warnings.
+    -Wimplicit-fallthrough
     )
   # Enable additional warnings depending on the compiler and compiler version in use.
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

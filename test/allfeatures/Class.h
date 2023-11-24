@@ -1,6 +1,7 @@
 // #needs: <string>
+// #class
 class Class {
    public:
     std::string s;
-#include NMT_GENERATED_DECLARATIONS
+#include NMT_MEMBER_DECLARATIONS
 };

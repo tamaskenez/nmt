@@ -2,6 +2,8 @@
 
 #include "util/enum_traits.h"
 #include "util/error.h"
+#include "util/stlext.h"
+#include "util/vx.hpp"
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/flags/flag.h>
@@ -32,3 +34,8 @@
 #include <cassert>
 #include <cctype>
 #include <cstdlib>
+
+// using vx::as;
+// using vx::is;
+// using vx::at;
+using vx::match;

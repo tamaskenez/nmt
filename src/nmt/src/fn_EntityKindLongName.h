@@ -15,7 +15,5 @@ std::string_view EntityKindLongName(EntityKind ek)
             return "using";
         case EntityKind::inlvar:
             return "inlvar";
-        case EntityKind::memfn:
-            return "memfn";
     }
 }
