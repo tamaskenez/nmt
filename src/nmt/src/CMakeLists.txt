@@ -1,3 +1,5 @@
+find_package(libtokenizer REQUIRED)
+
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS *.cpp *.h)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sources})
 
@@ -10,6 +12,7 @@ target_link_libraries(nmt PRIVATE
 	absl::flat_hash_map
 	fmt::fmt
 	CLI11::CLI11
+	libtokenizer::libtokenizer
 )
 
 target_precompile_headers(nmt PRIVATE pch.h)

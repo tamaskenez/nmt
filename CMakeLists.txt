@@ -7,7 +7,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 message(STATUS "BUILD_TESTING: ${BUILD_TESTING}")
 
-include(build/RunNMT.cmake)
+include(cmake/RunNMT.cmake)
 
 if(BUILD_TESTING)
 	enable_testing()
@@ -20,7 +20,7 @@ find_package(CLI11 REQUIRED)
 find_package(fmt REQUIRED)
 
 set(WARNINGS_AS_ERRORS 1)
-include(build/cpp_warnings.cmake)
+include(cmake/cpp_warnings.cmake)
 add_compile_options(${PROJECT_WARNING_FLAGS})
 
 if(BUILD_ALL)
