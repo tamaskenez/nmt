@@ -176,6 +176,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
     std::ranges::sort(result.fdneeds);
     std::ranges::sort(result.needs);
     std::ranges::sort(result.defneeds);
+#if 0
     struct {
         bool fdneeds{}, needs{}, defneeds{};
     } allowed;
@@ -263,12 +264,16 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                            fmt::join(result.defneeds, ", ")));
     }
     return result;
+#endif
+    CHECK(false);
+    return std::unexpected("not implemented");
 }
 
 std::expected<std::monostate, std::string> ProcessSource(
     const std::filesystem::path& sf,
     const Args& args,
     flat_hash_map<std::string, Entity>& entities) {
+    (void)entities;  // TODO
     auto maybeSource = ReadFile(sf);
     if (!maybeSource) {
         return std::unexpected("Can't open file for reading");
@@ -285,7 +290,7 @@ std::expected<std::monostate, std::string> ProcessSource(
     }
 
     TRY_ASSIGN(ep, ParsePreprocessedSource(pps));
-
+    (void)ep;  // TODO
 #if 0
     auto f =
         [&ep, &sf, &entities](std::expected<std::pair<std::string, std::string>, std::string> edOr)
@@ -318,8 +323,8 @@ std::expected<std::monostate, std::string> ProcessSource(
         if (!itb.second) {
             return std::unexpected(fmt::format("Duplicate name: `{}`, first {} then {}.",
                                                entity.name,
-                                               enum_name(itb.first->second.props.GetEntityKind()),
-                                               enum_name(entity.props.GetEntityKind())));
+                                               enum_name(itb.first->second.GetEntityKind()),
+                                               enum_name(entity.GetEntityKind())));
         }
         return std::monostate{};
     };
@@ -339,15 +344,17 @@ std::expected<std::monostate, std::string> ProcessSource(
             return std::unexpected("Not implemented");
     }
 #endif
+#if 0
     std::string name;
     auto entity = Entity{.name = name, .path = sf, .props = std::move(ep)};
     auto itb = entities.insert(std::make_pair(std::move(name), std::move(entity)));
     if (!itb.second) {
         return std::unexpected(fmt::format("Duplicate name: `{}`, first {} then {}.",
                                            entity.name,
-                                           enum_name(itb.first->second.props.GetEntityKind()),
-                                           enum_name(entity.props.GetEntityKind())));
+                                           enum_name(itb.first->second.GetEntityKind()),
+                                           enum_name(entity.GetEntityKind())));
     }
+#endif
     return std::monostate();
 }
 
@@ -495,7 +502,7 @@ int main(int argc, char* argv[]) {
                     LOG_IF(FATAL, it == entities.end()) << fmt::format(
                         "Entity `{}` needs `{}` but it's missing.", e.name, needName);
                     auto& ne = it->second;
-                    switch (ne.props.GetEntityKind()) {
+                    switch (ne.GetEntityKind()) {
                         case EntityKind::enum_:
                         case EntityKind::struct_:
                         case EntityKind::class_:
@@ -506,16 +513,15 @@ int main(int argc, char* argv[]) {
                             break;
                     }
                     if (refOnly) {
-                        auto* v = ne.props.ForwardDeclarationNeedsOrNull();
+                        auto* v = ne.ForwardDeclarationNeedsOrNull();
                         LOG_IF(FATAL, v == nullptr)
                             << fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
                                            "be forward declared.",
                                            e.name,
                                            need,
-                                           enum_name(ne.props.GetEntityKind()));
+                                           enum_name(ne.GetEntityKind()));
                         additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
-                        forwardDeclarations.push_back(
-                            fmt::format("{};", ne.props.ForwardDeclaration()));
+                        forwardDeclarations.push_back(fmt::format("{};", ne.ForwardDeclaration()));
                     } else {
                         auto path =
                             outputDir / fs::path(reinterpret_as_u8string_view(ne.HeaderFilename()));
@@ -535,45 +541,40 @@ int main(int argc, char* argv[]) {
                 [&includes, &args, &entities, &e](const std::vector<std::string>& needs) {
                     includes.addNeedsAsHeaders(entities, e, needs, args.outputDir);
                 };
-            switch (e.props.GetEntityKind()) {
+            switch (e.GetEntityKind()) {
                 case EntityKind::enum_:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Enum>(e.props.dependentProps)
-                            .opaqueEnumDeclarationNeeds);
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Enum>(e.props.dependentProps)
-                            .declarationNeeds);
+                    addNeedsAsHeaders(std::get<EntityDependentProperties::Enum>(e.dependentProps)
+                                          .opaqueEnumDeclarationNeeds);
+                    addNeedsAsHeaders(std::get<EntityDependentProperties::Enum>(e.dependentProps)
+                                          .declarationNeeds);
                     break;
                 case EntityKind::fn:
                     addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Fn>(e.props.dependentProps)
-                            .declarationNeeds);
+                        std::get<EntityDependentProperties::Fn>(e.dependentProps).declarationNeeds);
                     break;
                 case EntityKind::struct_:
                     addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::struct_)>(e.props.dependentProps)
+                        std::get<std::to_underlying(EntityKind::struct_)>(e.dependentProps)
                             .forwardDeclarationNeeds);
                     addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::struct_)>(e.props.dependentProps)
+                        std::get<std::to_underlying(EntityKind::struct_)>(e.dependentProps)
                             .declarationNeeds);
                     break;
                 case EntityKind::class_:
                     addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::class_)>(e.props.dependentProps)
+                        std::get<std::to_underlying(EntityKind::class_)>(e.dependentProps)
                             .forwardDeclarationNeeds);
                     addNeedsAsHeaders(
-                        std::get<std::to_underlying(EntityKind::class_)>(e.props.dependentProps)
+                        std::get<std::to_underlying(EntityKind::class_)>(e.dependentProps)
                             .declarationNeeds);
                     break;
                 case EntityKind::using_:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::Using>(e.props.dependentProps)
-                            .declarationNeeds);
+                    addNeedsAsHeaders(std::get<EntityDependentProperties::Using>(e.dependentProps)
+                                          .declarationNeeds);
                     break;
                 case EntityKind::inlvar:
-                    addNeedsAsHeaders(
-                        std::get<EntityDependentProperties::InlVar>(e.props.dependentProps)
-                            .declarationNeeds);
+                    addNeedsAsHeaders(std::get<EntityDependentProperties::InlVar>(e.dependentProps)
+                                          .declarationNeeds);
                     break;
             }
             auto renderedHeaders = includes.render();
@@ -582,7 +583,7 @@ int main(int argc, char* argv[]) {
             }
         }
         headerContent += "\n";
-        switch (e.props.GetEntityKind()) {
+        switch (e.GetEntityKind()) {
             case EntityKind::enum_:
             case EntityKind::using_:
             case EntityKind::inlvar:
@@ -590,8 +591,7 @@ int main(int argc, char* argv[]) {
                 break;
             case EntityKind::fn:
                 headerContent += fmt::format(
-                    "{};\n",
-                    std::get<EntityDependentProperties::Fn>(e.props.dependentProps).declaration);
+                    "{};\n", std::get<EntityDependentProperties::Fn>(e.dependentProps).declaration);
                 break;
             case EntityKind::struct_:
             case EntityKind::class_:
@@ -619,7 +619,7 @@ int main(int argc, char* argv[]) {
         std::string cppContent =
             fmt::format("{}\n#include \"{}\"\n", k_autogeneratedWarningLine, headerPath);
         switch_variant(
-            e.props.dependentProps,
+            e.dependentProps,
             [&args, &entities, &cppContent, &e](const EntityDependentProperties::Fn& dp) {
                 Includes includes;
                 includes.addNeedsAsHeaders(entities, e, dp.definitionNeeds, args.outputDir);
