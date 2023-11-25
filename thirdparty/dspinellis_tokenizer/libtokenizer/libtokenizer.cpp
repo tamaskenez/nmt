@@ -10,6 +10,11 @@
 // TODO in CharSource.h this line: `} while (c < 0 || c > 127);` should be patched
 // to include non-ASCII characters, otherwise non-ASCII characters offset the character counting.
 namespace libtokenizer {
+
+bool Token::IsInlineComment() const {
+    return type == TokenType::tok && value == "//...";
+}
+
 class CppTokenizer : public ::CppTokenizer {
    public:
     CppTokenizer(CharSource& s, std::vector<std::string> opt = {})

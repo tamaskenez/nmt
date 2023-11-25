@@ -1,14 +1,20 @@
 #include "pch.h"
 
+#include "Trim.h"
 #include "TryEatSpecialComment.h"
 #include "enums.h"
 #include "parse.h"
 
-// Eats EOL, too.
-const std::unordered_set<std::string_view> k_specialCommentKeywords(
-    enum_traits<SpecialCommentKeyword>::names.begin(),
-    enum_traits<SpecialCommentKeyword>::names.end());
+std::unordered_set<std::string_view> SpecialCommentKeywords() {
+    std::unordered_set<std::string_view> keywords(
+        BEGIN_END(enum_traits<SpecialCommentKeyword>::names));
+    keywords.insert(BEGIN_END(enum_traits<EntityKind>::names));
+    return keywords;
+}
 
+const std::unordered_set<std::string_view> k_specialCommentKeywords = SpecialCommentKeywords();
+
+// Eats EOL, too.
 std::expected<std::pair<std::vector<std::string_view>, std::string_view>, std::string>
 TryEatCommaSeparatedListPossiblyMultiline(std::string_view sv) {
     // Read comma-separated list.
@@ -71,8 +77,8 @@ TryEatCommaSeparatedListPossiblyMultiline(std::string_view sv) {
     return std::make_pair(std::move(items), sv);
 }
 
-std::expected<std::pair<SpecialComment, std::string_view>, std::string> TryEatSpecialComment(
-    std::string_view sv) {
+std::expected<SpecialComment, std::string> TryEatSpecialComment(std::string_view sv) {
+    sv = Trim(sv);
     auto afterSlashSlash = TryEatPrefix(sv, "//");
     if (!afterSlashSlash) {
         return std::unexpected(std::string());
@@ -87,8 +93,15 @@ std::expected<std::pair<SpecialComment, std::string_view>, std::string> TryEatSp
     }
     std::string_view keyword;
     std::tie(keyword, sv) = *symbolAndRestOr;
-    if (!k_specialCommentKeywords.contains(keyword) || sv.empty() || sv.front() != ':') {
-        return std::unexpected(std::string());
+    if (!k_specialCommentKeywords.contains(keyword)) {
+        return std::unexpected(std::string());  // Not an error but not a special comment.
+    }
+    if (sv.empty()) {
+        // Special comment without list
+        return SpecialComment{.keyword = keyword};
+    }
+    if (sv.front() != ':') {
+        return std::unexpected("Invalid character after special comment.");
     }
     sv.remove_prefix(1);
     auto listAndRestOr = TryEatCommaSeparatedListPossiblyMultiline(sv);
@@ -96,6 +109,5 @@ std::expected<std::pair<SpecialComment, std::string_view>, std::string> TryEatSp
         return std::unexpected(listAndRestOr.error());
     }
 
-    return std::make_pair(SpecialComment{.keyword = keyword, .list = listAndRestOr->first},
-                          listAndRestOr->second);
+    return SpecialComment{.keyword = keyword, .list = listAndRestOr->first};
 }

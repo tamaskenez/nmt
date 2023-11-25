@@ -2,6 +2,8 @@
 
 #include "enums.h"
 
+#include "libtokenizer.h"
+
 #ifdef NDEBUG
 template<class K, class V, class H = absl::flat_hash_map<K, V>::hasher>
 using flat_hash_map = absl::flat_hash_map<K, V, H>;
@@ -20,7 +22,7 @@ struct SpecialComment {
 };
 struct PreprocessedSource {
     std::vector<SpecialComment> specialComments;
-    std::vector<std::string_view> nonCommentCode;
+    libtokenizer::Result tokens;
 };
 
 struct MemberFunction {};
@@ -54,7 +56,12 @@ struct InlVar {
     // The source file contains the inline/constexpr variable declaration.
     std::vector<std::string> declarationNeeds;
 };
-using V = std::variant<Enum, Fn, StructOrClass, StructOrClass, Using, InlVar>;
+struct MemFn {
+    std::string declaration;
+    // The source file contains the function-definition.
+    std::vector<std::string> declarationNeeds, definitionNeeds;
+};
+using V = std::variant<Enum, Fn, StructOrClass, StructOrClass, Using, InlVar, MemFn>;
 // Make sure V's alternatives correspond to EntityKind values.
 // This function doesn't need to be called, it asserts in comptime.
 inline void AssertVariantIndices(EntityKind k) {
@@ -71,6 +78,7 @@ inline void AssertVariantIndices(EntityKind k) {
         CHECK_ALTERNATIVE(class_, StructOrClass);
         CHECK_ALTERNATIVE(using_, Using);
         CHECK_ALTERNATIVE(inlvar, InlVar);
+        CHECK_ALTERNATIVE(memfn, MemFn);
 #undef CHECK_ALTERNATIVE
     }
 }
@@ -86,7 +94,8 @@ inline V Make(EntityKind k) {
         MAKE_ALTERNATIVE(struct_);
         MAKE_ALTERNATIVE(class_);
         MAKE_ALTERNATIVE(using_);
-        MAKE_ALTERNATIVE(inlvar);
+			MAKE_ALTERNATIVE(inlvar);
+			MAKE_ALTERNATIVE(memfn);
 #    undef MAKE_ALTERNATIVE
     }
 }
@@ -139,6 +148,11 @@ struct Entity {
             },
             [](const EntityDependentProperties::InlVar& x) {
                 fmt::print("needs: {}\n", fmt::join(x.declarationNeeds, ", "));
+            },
+            [](const EntityDependentProperties::MemFn& x) {
+                fmt::print("declaration: {}\n", x.declaration);
+                fmt::print("needs: {}\n", fmt::join(x.declarationNeeds, ", "));
+                fmt::print("defNeeds: {}\n", fmt::join(x.definitionNeeds, ", "));
             });
         if (namespace_) {
             fmt::print("namespace: {}\n", *namespace_);
@@ -164,6 +178,7 @@ struct Entity {
             case fn:
             case using_:
             case inlvar:
+            case memfn:
                 return nullptr;
         }
     }
@@ -179,6 +194,7 @@ struct Entity {
             case fn:
             case using_:
             case inlvar:
+            case memfn:
                 LOG(FATAL) << fmt::format("Entity {} has no forward declaration",
                                           enum_name(GetEntityKind()));
         }

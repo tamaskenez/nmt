@@ -78,7 +78,7 @@ std::optional<std::vector<fs::path>> ResolveArgsSources(std::vector<fs::path> pa
 }
 
 struct ParsePreprocessedSourceResult {
-    std::optional<EntityKindOrSub> entityKindOrSub;
+    std::optional<EntityKind> entityKind;
     std::vector<std::string> fdneeds, needs, defneeds;
     std::optional<Visibility> visibility;
 };
@@ -124,24 +124,24 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                     }
                     break;
             }
-        } else if (auto entityKindOrSub = enum_from_name<EntityKindOrSub>(sc.keyword)) {
+        } else if (auto entityKind = enum_from_name<EntityKind>(sc.keyword)) {
             if (!sc.list.empty()) {
                 return std::unexpected(fmt::format(
                     "Unexpected list after `{}`: {}", sc.keyword, fmt::join(sc.list, ", ")));
             }
-            if (result.entityKindOrSub) {
+            if (result.entityKind) {
                 return std::unexpected(fmt::format("Duplicated kind, first: {}, then: {}",
-                                                   enum_name(*result.entityKindOrSub),
-                                                   enum_name(*entityKindOrSub)));
+                                                   enum_name(*result.entityKind),
+                                                   enum_name(*entityKind)));
             }
-            result.entityKindOrSub = *entityKindOrSub;
+            result.entityKind = *entityKind;
         } else {
             return std::unexpected(fmt::format("Invalid keyword: {}", sc.keyword));
         }
     }
-    if (!result.entityKindOrSub) {
+    if (!result.entityKind) {
         return std::unexpected(fmt::format("Missing `#<entity>` ({})",
-                                           fmt::join(enum_traits<EntityKindOrSub>::names, ", ")));
+                                           fmt::join(enum_traits<EntityKind>::names, ", ")));
     }
     //
     // Find the first nonCommentCode after the first specialComment.
@@ -166,11 +166,11 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
     auto decl = Trim(code);
     if (decl.empty()) {
         return std::unexpected(
-            fmt::format("No code found for `{}` entity.", enum_name(*result.entityKindOrSub)));
+            fmt::format("No code found for `{}` entity.", enum_name(*result.entityKind)));
     }
     if (decl.back() != ';') {
         return std::unexpected(fmt::format("Missing trailing semicolon at end of `{}` entity.",
-                                           enum_name(*result.entityKindOrSub)));
+                                           enum_name(*result.entityKind)));
     }
     //
     std::ranges::sort(result.fdneeds);
@@ -181,8 +181,8 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         bool fdneeds{}, needs{}, defneeds{};
     } allowed;
     std::optional<EntityDependentProperties::V> dependentProps;
-    switch (*result.entityKindOrSub) {
-        case EntityKindOrSub::enum_:
+    switch (*result.entityKind) {
+        case EntityKind::enum_:
             allowed.fdneeds = true;
             allowed.needs = true;
             auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
@@ -196,7 +196,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                     .opaqueEnumDeclarationNeeds = std::move(result.fdneeds),
                     .declarationNeeds = std::move(result.needs)});
             break;
-        case EntityKindOrSub::fn:
+        case EntityKind::fn:
             allowed.needs = true;
             allowed.defneeds = true;
             auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
@@ -209,7 +209,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                        .declarationNeeds = std::move(result.needs),
                                        .definitionNeeds = std::move(result.defneeds)});
             break;
-        case EntityKindOrSub::struct_:
+        case EntityKind::struct_:
             allowed.fdneeds = true;
             allowed.needs = true;
             dependentProps.emplace(std::in_place_index<std::to_underlying(struct_)>,
@@ -217,7 +217,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                        .forwardDeclarationNeeds = std::move(result.fdneeds),
                                        .declarationNeeds = std::move(result.needs)});
             break;
-        case EntityKindOrSub::class_:
+        case EntityKind::class_:
             allowed.fdneeds = true;
             allowed.needs = true;
             dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
@@ -225,20 +225,20 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                        .forwardDeclarationNeeds = std::move(result.fdneeds),
                                        .declarationNeeds = std::move(result.needs)});
             break;
-        case EntityKindOrSub::using_: {
+        case EntityKind::using_: {
             allowed.needs = true;
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(using_)>,
                 EntityDependentProperties::Using{.declaration = CompactSpaces(decl),
                                                  .declarationNeeds = std::move(result.needs)});
         } break;
-        case EntityKindOrSub::inlvar:
+        case EntityKind::inlvar:
             allowed.needs = true;
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(inlvar)>,
                 EntityDependentProperties::InlVar{.declarationNeeds = std::move(result.needs)});
             break;
-        case EntityKindOrSub::memfn:
+        case EntityKind::memfn:
             allowed.needs = true;
             allowed.defneeds = true;
             auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
@@ -250,17 +250,17 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
     }
     if (!allowed.fdneeds && !result.fdneeds.empty()) {
         return std::unexpected(fmt::format("`{}` entities can't have fdneeds, here we have: {}",
-                                           enum_name(*result.entityKindOrSub),
+                                           enum_name(*result.entityKind),
                                            fmt::join(result.fdneeds, ", ")));
     }
     if (!allowed.needs && !result.needs.empty()) {
         return std::unexpected(fmt::format("`{}` entities can't have needs, here we have: {}",
-                                           enum_name(*result.entityKindOrSub),
+                                           enum_name(*result.entityKind),
                                            fmt::join(result.needs, ", ")));
     }
     if (!allowed.defneeds && !result.defneeds.empty()) {
         return std::unexpected(fmt::format("`{}` entities can't have defneeds, here we have: {}",
-                                           enum_name(*result.entityKindOrSub),
+                                           enum_name(*result.entityKind),
                                            fmt::join(result.defneeds, ", ")));
     }
     return result;
@@ -270,21 +270,16 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
 }
 
 std::expected<std::monostate, std::string> ProcessSource(
-    const std::filesystem::path& sf,
-    const Args& args,
+    const std::filesystem::path& sourcePath,
+    const ProgramOptions& programOptions,
     flat_hash_map<std::string, Entity>& entities) {
     (void)entities;  // TODO
-    auto maybeSource = ReadFile(sf);
-    if (!maybeSource) {
-        return std::unexpected("Can't open file for reading");
-    }
-    auto& source = *maybeSource;
-
-    TRY_ASSIGN(pps, PreprocessSource(source))
+    TRY_ASSIGN_OR_UNEXPECTED(sourceContent, ReadFile(sourcePath), "Can't open file for reading");
+    TRY_ASSIGN(pps, PreprocessSource(sourceContent));
 
     if (pps.specialComments.empty()) {
-        if (args.verbose) {
-            fmt::print(stderr, "Ignoring file without special comments: {}\n", sf);
+        if (programOptions.verbose) {
+            fmt::print(stderr, "Ignoring file without special comments: {}\n", sourcePath);
         }
         return {};
     }
@@ -363,7 +358,7 @@ int main(int argc, char* argv[]) {
 
     CLI::App app("C++ boilerplate generator", "NMT");
 
-    Args args;
+    ProgramOptions args;
 
     app.add_option(
         "-s,--sources",
@@ -502,6 +497,7 @@ int main(int argc, char* argv[]) {
                     LOG_IF(FATAL, it == entities.end()) << fmt::format(
                         "Entity `{}` needs `{}` but it's missing.", e.name, needName);
                     auto& ne = it->second;
+                    CHECK(false);  // TODO what's the next switch?
                     switch (ne.GetEntityKind()) {
                         case EntityKind::enum_:
                         case EntityKind::struct_:
@@ -510,6 +506,7 @@ int main(int argc, char* argv[]) {
                         case EntityKind::fn:
                         case EntityKind::using_:
                         case EntityKind::inlvar:
+                        case EntityKind::memfn:
                             break;
                     }
                     if (refOnly) {
@@ -576,6 +573,12 @@ int main(int argc, char* argv[]) {
                     addNeedsAsHeaders(std::get<EntityDependentProperties::InlVar>(e.dependentProps)
                                           .declarationNeeds);
                     break;
+                case EntityKind::memfn:
+                    CHECK(false);  // TODO this is not true, memfn's declaration needs go to the
+                                   // class/struct header.
+                    addNeedsAsHeaders(std::get<EntityDependentProperties::MemFn>(e.dependentProps)
+                                          .declarationNeeds);
+                    break;
             }
             auto renderedHeaders = includes.render();
             if (!renderedHeaders.empty()) {
@@ -604,6 +607,12 @@ int main(int argc, char* argv[]) {
                         / fs::path(reinterpret_as_u8string_view(e.MemberDeclarationsFilename())),
                     e.path,
                     k_nmtIncludeMemberDeclarationsMacro);
+                break;
+            case EntityKind::memfn:
+                CHECK(false);  // TODO this is not true, memfn declaration goes to the member
+                               // function declaration file which gets injected with a macro.
+                headerContent += fmt::format(
+                    "{};\n", std::get<EntityDependentProperties::Fn>(e.dependentProps).declaration);
                 break;
         }
         fmt::print("Processed {} from {}\n", e.name, e.path);

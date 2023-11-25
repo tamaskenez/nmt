@@ -21,8 +21,15 @@ namespace {
 using value_type = std::unique_ptr<int>;
 using EXV = std::expected<std::monostate, std::string>;
 using EXI = std::expected<value_type, std::string>;
+using OPI = std::optional<value_type>;
+
+static_assert(is_std_optional_v<OPI>);
+static_assert(!is_std_optional_v<EXI>);
+static_assert(!is_std_expected_v<OPI>);
+static_assert(is_std_expected_v<EXI>);
 
 constexpr std::string_view k_errorString = "some error";
+constexpr std::string_view k_errorString2 = "some other error";
 constexpr int k_okInt = 345;
 
 enum class StatementReached { yes, no };
@@ -134,4 +141,64 @@ TEST(error, to_optional_error) {
     auto x = to_optional(EXI(std::unexpected(k_errorString)));
     static_assert(std::is_same_v<decltype(x), std::optional<value_type>>);
     ASSERT_FALSE(x);
+}
+
+namespace {
+EXI exercise_TRY_ASSIGN_OR_UNEXPECTED_optional(bool ok) {
+    statementReached = StatementReached::no;
+    auto value = std::make_unique<int>(k_okInt);
+    TRY_ASSIGN_OR_UNEXPECTED(x, ok ? OPI(std::move(value)) : OPI(), std::string(k_errorString));
+    static_assert(std::is_same_v<std::decay_t<decltype(x)>, value_type>);
+    statementReached = StatementReached::yes;
+    return x;
+}
+}  // namespace
+
+TEST(error, optional_TRY_ASSIGN_OR_UNEXPECTED_ok) {
+    statementReached.reset();
+    auto r = exercise_TRY_ASSIGN_OR_UNEXPECTED_optional(true);
+    ASSERT_TRUE(r.has_value());
+    ASSERT_EQ(**r, k_okInt);
+    ASSERT_EQ(statementReached, StatementReached::yes);
+}
+
+TEST(error, optional_TRY_ASSIGN_OR_UNEXPECTED_error) {
+    statementReached.reset();
+    auto r = exercise_TRY_ASSIGN_OR_UNEXPECTED_optional(false);
+    ASSERT_FALSE(r.has_value());
+    ASSERT_EQ(r.error(), k_errorString);
+    ASSERT_EQ(statementReached, StatementReached::no);
+}
+
+namespace {
+EXI exercise_TRY_ASSIGN_OR_UNEXPECTED_expected(bool ok) {
+    statementReached = StatementReached::no;
+    auto value = std::make_unique<int>(k_okInt);
+    EXI exi;
+    if (ok) {
+        exi = std::move(value);
+    } else {
+        exi = std::unexpected(k_errorString2);
+    }
+    TRY_ASSIGN_OR_UNEXPECTED(x, std::move(exi), std::string(k_errorString));
+    static_assert(std::is_same_v<std::decay_t<decltype(x)>, value_type>);
+    statementReached = StatementReached::yes;
+    return x;
+}
+}  // namespace
+
+TEST(error, expected_TRY_ASSIGN_OR_UNEXPECTED_ok) {
+    statementReached.reset();
+    auto r = exercise_TRY_ASSIGN_OR_UNEXPECTED_expected(true);
+    ASSERT_TRUE(r.has_value());
+    ASSERT_EQ(**r, k_okInt);
+    ASSERT_EQ(statementReached, StatementReached::yes);
+}
+
+TEST(error, expected_TRY_ASSIGN_OR_UNEXPECTED_error) {
+    statementReached.reset();
+    auto r = exercise_TRY_ASSIGN_OR_UNEXPECTED_expected(false);
+    ASSERT_FALSE(r.has_value());
+    ASSERT_EQ(r.error(), k_errorString);
+    ASSERT_EQ(statementReached, StatementReached::no);
 }

@@ -64,17 +64,35 @@
 #define UTIL_PP_CONCAT2(A, B) A##B
 #define UTIL_PP_CONCAT(A, B)  UTIL_PP_CONCAT2(A, B)
 
-#define _TRY_INTERNAL(EXPECTED, TMP_VAR, TMP_VAR_TYPE)                                          \
-    do {                                                                                        \
-        auto&& TMP_VAR = (EXPECTED);                                                            \
-        static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                           \
-        using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                                   \
-        /* assert that it's std::expected<std::monostate, E> */                                 \
-        static_assert(std::is_same_v<TMP_VAR_TYPE,                                              \
-                                     std::expected<std::monostate, TMP_VAR_TYPE::error_type>>); \
-        if (!TMP_VAR.has_value()) {                                                             \
-            return std::unexpected(std::move(TMP_VAR.error()));                                 \
-        }                                                                                       \
+template<class T>
+struct is_std_optional : std::false_type {};
+
+template<class T>
+struct is_std_optional<std::optional<T>> : std::true_type {};
+
+template<class T>
+inline constexpr bool is_std_optional_v = is_std_optional<T>::value;
+
+template<class T>
+struct is_std_expected : std::false_type {};
+
+template<class T, class E>
+struct is_std_expected<std::expected<T, E>> : std::true_type {};
+
+template<class T>
+inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
+
+#define _TRY_INTERNAL(EXPECTED, TMP_VAR, TMP_VAR_TYPE)                              \
+    do {                                                                            \
+        auto&& TMP_VAR = (EXPECTED);                                                \
+        static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);               \
+        using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                       \
+        /* assert that it's std::expected<std::monostate, E> */                     \
+        static_assert(is_std_expected_v<TMP_VAR_TYPE>                               \
+                      && std::is_same_v<TMP_VAR_TYPE::value_type, std::monostate>); \
+        if (!TMP_VAR.has_value()) {                                                 \
+            return std::unexpected(std::move(TMP_VAR.error()));                     \
+        }                                                                           \
     } while (false)
 
 #define TRY(EXPECTED)                                     \
@@ -88,27 +106,45 @@
 //
 // will result in compiler error because the internal variable will be not in scope for the
 // assignment.
-#define _TRY_ASSIGN_INTERNAL(X, EXPECTED, TMP_VAR, TMP_VAR_TYPE)                            \
-    auto&& TMP_VAR = (EXPECTED);                                                            \
-    static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                           \
-    using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                                   \
-    /* assert that it's std::expected<T, E> */                                              \
-    static_assert(                                                                          \
-        std::is_same_v<TMP_VAR_TYPE,                                                        \
-                       std::expected<TMP_VAR_TYPE::value_type, TMP_VAR_TYPE::error_type>>); \
-    if (!TMP_VAR.has_value()) {                                                             \
-        return std::unexpected(std::move(TMP_VAR.error()));                                 \
-    }                                                                                       \
-    auto&& X = std::move(*TMP_VAR);
+#define _TRY_ASSIGN_INTERNAL(VAR, EXPECTED, TMP_VAR, TMP_VAR_TYPE) \
+    auto&& TMP_VAR = (EXPECTED);                                   \
+    static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);  \
+    using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;          \
+    /* assert that it's std::expected<T, E> */                     \
+    static_assert(is_std_expected_v<TMP_VAR_TYPE>);                \
+    if (!TMP_VAR.has_value()) {                                    \
+        return std::unexpected(std::move(TMP_VAR.error()));        \
+    }                                                              \
+    auto&& VAR = std::move(*TMP_VAR)
 
-#define TRY_ASSIGN(X, EXPECTED)                                  \
-    _TRY_ASSIGN_INTERNAL(X,                                      \
+#define TRY_ASSIGN(VAR, EXPECTED)                                \
+    _TRY_ASSIGN_INTERNAL(VAR,                                    \
                          EXPECTED,                               \
                          UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
                          UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
 
+// __VA_ARGS__ are the arguments for std::unexpected()
+#define _TRY_ASSIGN_OR_UNEXPECTED_INTERNAL(VAR, EXPECTED_OR_OPTIONAL, TMP_VAR, TMP_VAR_TYPE, ...) \
+    auto&& TMP_VAR = (EXPECTED_OR_OPTIONAL);                                                      \
+    static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                                 \
+    using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                                         \
+    /* assert that it's std::expected<T, E> or std::optional<T> */                                \
+    static_assert(is_std_expected_v<TMP_VAR_TYPE> || is_std_optional_v<TMP_VAR_TYPE>);            \
+    if (!TMP_VAR.has_value()) {                                                                   \
+        return std::unexpected(__VA_ARGS__);                                                      \
+    }                                                                                             \
+    auto&& VAR = std::move(*TMP_VAR)
+
+// __VA_ARGS__ are the arguments for std::unexpected()
+#define TRY_ASSIGN_OR_UNEXPECTED(VAR, EXPECTED_OR_OPTIONAL, ...)                    \
+    _TRY_ASSIGN_OR_UNEXPECTED_INTERNAL(VAR,                                         \
+                                       EXPECTED_OR_OPTIONAL,                        \
+                                       UTIL_PP_CONCAT(_tmp_var_, __COUNTER__),      \
+                                       UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__), \
+                                       __VA_ARGS__)
+
 #ifndef _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL
-#    define _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(X)
+#    define _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(VAR)
 #endif
 
 namespace detail {

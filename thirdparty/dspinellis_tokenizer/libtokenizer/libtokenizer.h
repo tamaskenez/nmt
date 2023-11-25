@@ -11,6 +11,7 @@ struct Token {
     TokenType type;
     std::string value;
     std::string_view sourceValue;
+    bool IsInlineComment() const;
 };
 
 struct Result {

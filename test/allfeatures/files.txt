@@ -1,7 +1,7 @@
-enum_Enum.h
-fn_Function.h
+Enum.h
+Function.h
 kThree.h
-sc_Class.h
-sc_Struct.h
+Class.h
+Struct.h
 EnumUnderlyingType.h
-sc_Class/mf_mf.h
+Class/mf.h
