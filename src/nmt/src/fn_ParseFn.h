@@ -17,7 +17,7 @@ std::expected<std::pair<std::string, std::string>, std::string> ParseFunction(st
         return std::unexpected(
             "First opening curly bracket found before the first opening parentheses.");
     }
-    auto tv = Trim(sv0.substr(0, firstOpeningParenthesis));
+    auto tv = trim(sv0.substr(0, firstOpeningParenthesis));
     auto i = tv.size();
     while (i > 0 && (isalnum(tv[i - 1]) || tv[i - 1] == '_')) {
         --i;

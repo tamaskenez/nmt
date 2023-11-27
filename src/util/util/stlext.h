@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <string>
 #include <string_view>
 #include <variant>
 
@@ -22,3 +24,9 @@ auto switch_variant(Variant&& variant, Ts&&... ts) {
 }
 
 std::string_view trim(std::string_view sv);  // Trim if `std::isspace()`.
+
+// Return path.u8string() but as a std::string (without any conversion).
+std::string path_to_string(const std::filesystem::path& p);
+
+// Return path.u8string() but as a std::string (without any conversion).
+std::filesystem::path path_from_string(std::string_view sv);

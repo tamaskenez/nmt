@@ -48,7 +48,7 @@ std::expected<std::pair<std::string, std::string>, std::string> ParseEnum(std::s
     auto rawName = sv.substr(0, sv.size() - uv.size());
     auto finalName = ExtractIdentifier(rawName);
     if (!finalName) {
-        return std::unexpected(fmt::format("Invalid enum name: {}", Trim(rawName)));
+        return std::unexpected(fmt::format("Invalid enum name: {}", trim(rawName)));
     }
     if (uv.front() == ':') {
         uv = EatWhileNot(uv, "{");

@@ -5,7 +5,6 @@
 #include "PreprocessSource.h"
 #include "ReadFile.h"
 #include "ReadFileAsLines.h"
-#include "Trim.h"
 #include "WriteFile.h"
 #include "data.h"
 #include "fn_CompactSpaces.h"
@@ -14,7 +13,7 @@
 #include "fn_ParseFn.h"
 #include "fn_ParseStructClass.h"
 // #include "fn_fs_exists_total.h"
-#include "fn_reinterpret_as_u8string_view.h"
+#include "TokenSearch.h"
 #include "sc_Args.h"
 
 namespace fs = std::filesystem;
@@ -84,7 +83,7 @@ struct ParsePreprocessedSourceResult {
 };
 
 std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSource(
-    const PreprocessedSource& pps) {
+    std::string_view name, const PreprocessedSource& pps) {
     ParsePreprocessedSourceResult result;
     for (auto& sc : pps.specialComments) {
         if (auto keyword = enum_from_name<SpecialCommentKeyword>(sc.keyword)) {
@@ -143,6 +142,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         return std::unexpected(fmt::format("Missing `#<entity>` ({})",
                                            fmt::join(enum_traits<EntityKind>::names, ", ")));
     }
+#if 0
     //
     // Find the first nonCommentCode after the first specialComment.
     CHECK(!pps.specialComments.empty());
@@ -163,7 +163,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         code += *it;
         code += ' ';
     }
-    auto decl = Trim(code);
+    auto decl = trim(code);
     if (decl.empty()) {
         return std::unexpected(
             fmt::format("No code found for `{}` entity.", enum_name(*result.entityKind)));
@@ -172,33 +172,66 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         return std::unexpected(fmt::format("Missing trailing semicolon at end of `{}` entity.",
                                            enum_name(*result.entityKind)));
     }
+#endif
     //
     std::ranges::sort(result.fdneeds);
     std::ranges::sort(result.needs);
     std::ranges::sort(result.defneeds);
-#if 0
     struct {
         bool fdneeds{}, needs{}, defneeds{};
     } allowed;
     std::optional<EntityDependentProperties::V> dependentProps;
+    CHECK(!pps.specialComments.empty());
+    // Find the token corresponding to the first specialComment.
+    auto firstSpecialCommentKeyword = pps.specialComments.front().keyword;
+    std::optional<int> firstSpecialCommentTokenIdx;
+    for (size_t i = 0; i < pps.tokens.tokens.size(); ++i) {
+        auto& token_i = pps.tokens.tokens[i];
+        if (token_i.sourceValue.data() <= firstSpecialCommentKeyword.data()) {
+            CHECK(firstSpecialCommentKeyword.data() + firstSpecialCommentKeyword.size()
+                  <= token_i.sourceValue.data() + token_i.sourceValue.size());
+            firstSpecialCommentTokenIdx = i;
+            break;
+        }
+    }
+    CHECK(firstSpecialCommentTokenIdx);
+    using libtokenizer::Token;
+    using libtokenizer::TokenType;
+    auto tokensFromFirstSpecialComment = std::span<const Token>(
+        pps.tokens.tokens.begin() + *firstSpecialCommentTokenIdx, pps.tokens.tokens.end());
     switch (*result.entityKind) {
-        case EntityKind::enum_:
+        case EntityKind::enum_: {
             allowed.fdneeds = true;
             allowed.needs = true;
-            auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
-            if (declUntilFirstOpeningBrace.empty()) {
-                return std::unexpected("No `{` found in enum declaration.");
+            // Expected: enum ... name ... { ... } ;
+            size_t openingBraceIdx = SIZE_T_MAX;
+            auto searchResult = std::move(TokenSearch(tokensFromFirstSpecialComment)
+                                              .Eat(TokenType::kw, "enum")
+                                              .Find(TokenType::id, name)
+                                              .Find(TokenType::tok, "{", &openingBraceIdx)
+                                              .GoToLast()
+                                              .Assert(TokenType::tok, ";")
+                                              .GoToPrevious()
+                                              .Assert(TokenType::tok, "}"))
+                                    .FinishSearch();
+            if (!searchResult.has_value()) {
+                return std::unexpected(
+                    fmt::format("Invalid enum declaration ({})", searchResult.error()));
             }
-            dependentProps.emplace(
-                std::in_place_index<std::to_underlying(EntityKind::enum_)>,
-                EntityDependentProperties::Enum{
-                    .opaqueEnumDeclaration = std::string(declUntilFirstOpeningBrace),
-                    .opaqueEnumDeclarationNeeds = std::move(result.fdneeds),
-                    .declarationNeeds = std::move(result.needs)});
-            break;
+            auto opaqueEnumDeclaration =
+                std::string_view(tokensFromFirstSpecialComment[openingBraceIdx].sourceValue.data(),
+                                 tokensFromFirstSpecialComment.back().sourceValue.data()
+                                     + tokensFromFirstSpecialComment.back().sourceValue.size());
+            dependentProps.emplace(std::in_place_index<std::to_underlying(EntityKind::enum_)>,
+                                   EntityDependentProperties::Enum{
+                                       .opaqueEnumDeclaration = std::string(opaqueEnumDeclaration),
+                                       .opaqueEnumDeclarationNeeds = std::move(result.fdneeds),
+                                       .declarationNeeds = std::move(result.needs)});
+        } break;
         case EntityKind::fn:
             allowed.needs = true;
             allowed.defneeds = true;
+#if 0
             auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
             if (declUntilFirstOpeningBrace.empty()) {
                 return std::unexpected("No `{` found in function definition.");
@@ -208,44 +241,55 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                        .declaration = std::string(declUntilFirstOpeningBrace),
                                        .declarationNeeds = std::move(result.needs),
                                        .definitionNeeds = std::move(result.defneeds)});
+#endif
             break;
         case EntityKind::struct_:
             allowed.fdneeds = true;
             allowed.needs = true;
+#if 0
             dependentProps.emplace(std::in_place_index<std::to_underlying(struct_)>,
                                    EntityDependentProperties::StructOrClass{
                                        .forwardDeclarationNeeds = std::move(result.fdneeds),
                                        .declarationNeeds = std::move(result.needs)});
+#endif
             break;
         case EntityKind::class_:
             allowed.fdneeds = true;
             allowed.needs = true;
+#if 0
             dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
                                    EntityDependentProperties::StructOrClass{
                                        .forwardDeclarationNeeds = std::move(result.fdneeds),
                                        .declarationNeeds = std::move(result.needs)});
+#endif
             break;
         case EntityKind::using_: {
             allowed.needs = true;
+#if 0
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(using_)>,
                 EntityDependentProperties::Using{.declaration = CompactSpaces(decl),
                                                  .declarationNeeds = std::move(result.needs)});
+#endif
         } break;
         case EntityKind::inlvar:
             allowed.needs = true;
+#if 0
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(inlvar)>,
                 EntityDependentProperties::InlVar{.declarationNeeds = std::move(result.needs)});
+#endif
             break;
         case EntityKind::memfn:
             allowed.needs = true;
             allowed.defneeds = true;
+#if 0
             auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
             if (declUntilFirstOpeningBrace.empty()) {
                 return std::unexpected("No `{` found in member function definition.");
             }
             // Also find ClassName::Function
+#endif
             break;
     }
     if (!allowed.fdneeds && !result.fdneeds.empty()) {
@@ -264,9 +308,6 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                            fmt::join(result.defneeds, ", ")));
     }
     return result;
-#endif
-    CHECK(false);
-    return std::unexpected("not implemented");
 }
 
 std::expected<std::monostate, std::string> ProcessSource(
@@ -284,7 +325,9 @@ std::expected<std::monostate, std::string> ProcessSource(
         return {};
     }
 
-    TRY_ASSIGN(ep, ParsePreprocessedSource(pps));
+    std::string name = path_to_string(sourcePath.stem());
+
+    TRY_ASSIGN(ep, ParsePreprocessedSource(name, pps));
     (void)ep;  // TODO
 #if 0
     auto f =
@@ -520,8 +563,7 @@ int main(int argc, char* argv[]) {
                         additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
                         forwardDeclarations.push_back(fmt::format("{};", ne.ForwardDeclaration()));
                     } else {
-                        auto path =
-                            outputDir / fs::path(reinterpret_as_u8string_view(ne.HeaderFilename()));
+                        auto path = outputDir / path_from_string(ne.HeaderFilename());
                         generateds.push_back(fmt::format("\"{}\"", path));
                     }
                 }
@@ -600,13 +642,12 @@ int main(int argc, char* argv[]) {
             case EntityKind::class_:
                 // TODO (not here) determine source files' relative dires and
                 // generate output files according to relative dirs.
-                headerContent += fmt::format(
-                    "#define {} \"{}\"\n#include \"{}\"\n#undef {}\n",
-                    k_nmtIncludeMemberDeclarationsMacro,
-                    args.outputDir
-                        / fs::path(reinterpret_as_u8string_view(e.MemberDeclarationsFilename())),
-                    e.path,
-                    k_nmtIncludeMemberDeclarationsMacro);
+                headerContent +=
+                    fmt::format("#define {} \"{}\"\n#include \"{}\"\n#undef {}\n",
+                                k_nmtIncludeMemberDeclarationsMacro,
+                                args.outputDir / path_from_string(e.MemberDeclarationsFilename()),
+                                e.path,
+                                k_nmtIncludeMemberDeclarationsMacro);
                 break;
             case EntityKind::memfn:
                 CHECK(false);  // TODO this is not true, memfn declaration goes to the member

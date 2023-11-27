@@ -1,7 +1,7 @@
 #pragma once
 
 std::optional<std::string_view> ExtractIdentifier(std::string_view sv) {
-    auto r = Trim(sv);
+    auto r = trim(sv);
     if (r.empty()) {
         return std::nullopt;
     }

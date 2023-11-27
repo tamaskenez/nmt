@@ -17,7 +17,7 @@ std::expected<std::pair<std::string, std::string>, std::string> ParseStructClass
 
     std::optional<std::string> finalName;
     for ([[maybe_unused]] int pass : {1, 2}) {
-        auto tv = Trim(sv0.substr(0, nameFinalEndPos));
+        auto tv = trim(sv0.substr(0, nameFinalEndPos));
 
         auto i = tv.size();
         while (i > 0 && (isalnum(tv[i - 1]) || tv[i - 1] == '_')) {

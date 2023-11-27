@@ -1,7 +1,7 @@
 #pragma once
 
 std::string CompactSpaces(std::string_view sv) {
-    sv = Trim(sv);
+    sv = trim(sv);
     std::string r;
     r.reserve(sv.size());
     for (auto c : sv) {

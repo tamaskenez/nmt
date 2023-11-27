@@ -11,8 +11,20 @@
 // to include non-ASCII characters, otherwise non-ASCII characters offset the character counting.
 namespace libtokenizer {
 
-bool Token::IsInlineComment() const {
-    return type == TokenType::tok && value == "//...";
+std::string_view to_string_view(TokenType t) {
+    switch (t) {
+        using enum TokenType;
+        case tok:
+            return "tok";
+        case kw:
+            return "kw";
+        case num:
+            return "num";
+        case id:
+            return "id";
+        case hash:
+            return "hash";
+    }
 }
 
 class CppTokenizer : public ::CppTokenizer {

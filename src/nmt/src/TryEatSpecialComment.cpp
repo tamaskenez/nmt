@@ -1,6 +1,5 @@
 #include "pch.h"
 
-#include "Trim.h"
 #include "TryEatSpecialComment.h"
 #include "enums.h"
 #include "parse.h"
@@ -78,7 +77,7 @@ TryEatCommaSeparatedListPossiblyMultiline(std::string_view sv) {
 }
 
 std::expected<SpecialComment, std::string> TryEatSpecialComment(std::string_view sv) {
-    sv = Trim(sv);
+    sv = trim(sv);
     auto afterSlashSlash = TryEatPrefix(sv, "//");
     if (!afterSlashSlash) {
         return std::unexpected(std::string());

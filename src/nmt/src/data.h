@@ -17,7 +17,7 @@ using flat_hash_set = std::unordered_set<K, H>;
 #endif
 
 struct SpecialComment {
-    std::string_view keyword;
+    std::string_view keyword;  // Points into the original source text.
     std::vector<std::string_view> list;
 };
 struct PreprocessedSource {

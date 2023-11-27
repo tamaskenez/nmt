@@ -1,4 +1,4 @@
 // #enum
-enum class Enum : EnumUnderlyingType { One, Two, Three = kThree };
+enum class Enum : EnumUnderlyingType /* block comment */ { One, Two, Three = kThree };
 // #oedneeds: EnumUnderlyingType
 // #needs: kThree
