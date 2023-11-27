@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cassert>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -30,3 +32,8 @@ std::string path_to_string(const std::filesystem::path& p);
 
 // Return path.u8string() but as a std::string (without any conversion).
 std::filesystem::path path_from_string(std::string_view sv);
+
+template<class T>
+auto data_plus_size(const T& container) {
+    return container.data() + container.size();
+}

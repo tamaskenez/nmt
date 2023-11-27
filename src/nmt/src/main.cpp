@@ -83,7 +83,7 @@ struct ParsePreprocessedSourceResult {
 };
 
 std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSource(
-    std::string_view name, const PreprocessedSource& pps) {
+    std::string_view name, const PreprocessedSource& pps, std::string_view parentDirName) {
     ParsePreprocessedSourceResult result;
     for (auto& sc : pps.specialComments) {
         if (auto keyword = enum_from_name<SpecialCommentKeyword>(sc.keyword)) {
@@ -184,29 +184,29 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
     CHECK(!pps.specialComments.empty());
     // Find the token corresponding to the first specialComment.
     auto firstSpecialCommentKeyword = pps.specialComments.front().keyword;
-    std::optional<int> firstSpecialCommentTokenIdx;
-    for (size_t i = 0; i < pps.tokens.tokens.size(); ++i) {
-        auto& token_i = pps.tokens.tokens[i];
-        if (token_i.sourceValue.data() <= firstSpecialCommentKeyword.data()) {
-            CHECK(firstSpecialCommentKeyword.data() + firstSpecialCommentKeyword.size()
-                  <= token_i.sourceValue.data() + token_i.sourceValue.size());
-            firstSpecialCommentTokenIdx = i;
-            break;
-        }
-    }
-    CHECK(firstSpecialCommentTokenIdx);
+
+    auto it = std::ranges::lower_bound(
+        pps.tokens.tokens, firstSpecialCommentKeyword.data(), {}, [](const libtokenizer::Token& t) {
+            return t.sourceValue.data();
+        });
+    CHECK(it != pps.tokens.tokens.end()
+          && data_plus_size(firstSpecialCommentKeyword) <= data_plus_size(it->sourceValue));
+
+    auto firstSpecialCommentTokenIdx = it - pps.tokens.tokens.begin();
+
     using libtokenizer::Token;
     using libtokenizer::TokenType;
     auto tokensFromFirstSpecialComment = std::span<const Token>(
-        pps.tokens.tokens.begin() + *firstSpecialCommentTokenIdx, pps.tokens.tokens.end());
+        pps.tokens.tokens.begin() + firstSpecialCommentTokenIdx, pps.tokens.tokens.end());
     switch (*result.entityKind) {
         case EntityKind::enum_: {
             allowed.fdneeds = true;
             allowed.needs = true;
             // Expected: enum ... name ... { ... } ;
+            size_t enumIdx = SIZE_T_MAX;
             size_t openingBraceIdx = SIZE_T_MAX;
             auto searchResult = std::move(TokenSearch(tokensFromFirstSpecialComment)
-                                              .Eat(TokenType::kw, "enum")
+                                              .Eat(TokenType::kw, "enum", &enumIdx)
                                               .Find(TokenType::id, name)
                                               .Find(TokenType::tok, "{", &openingBraceIdx)
                                               .GoToLast()
@@ -219,9 +219,8 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                     fmt::format("Invalid enum declaration ({})", searchResult.error()));
             }
             auto opaqueEnumDeclaration =
-                std::string_view(tokensFromFirstSpecialComment[openingBraceIdx].sourceValue.data(),
-                                 tokensFromFirstSpecialComment.back().sourceValue.data()
-                                     + tokensFromFirstSpecialComment.back().sourceValue.size());
+                std::string_view(tokensFromFirstSpecialComment[enumIdx].sourceValue.data(),
+                                 tokensFromFirstSpecialComment[openingBraceIdx].sourceValue.data());
             dependentProps.emplace(std::in_place_index<std::to_underlying(EntityKind::enum_)>,
                                    EntityDependentProperties::Enum{
                                        .opaqueEnumDeclaration = std::string(opaqueEnumDeclaration),
@@ -280,17 +279,74 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                 EntityDependentProperties::InlVar{.declarationNeeds = std::move(result.needs)});
 #endif
             break;
-        case EntityKind::memfn:
+        case EntityKind::memfn: {
             allowed.needs = true;
             allowed.defneeds = true;
-#if 0
-            auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
-            if (declUntilFirstOpeningBrace.empty()) {
-                return std::unexpected("No `{` found in member function definition.");
+            // Expected: ... classname :: name ( ... ) ... { ... }
+            auto className = parentDirName;
+            auto tokens = tokensFromFirstSpecialComment;
+            size_t openingParenIdx = SIZE_T_MAX;
+            for (;;) {
+                size_t classNameIdx = SIZE_T_MAX;
+                auto searchResult = std::move(TokenSearch(tokens)
+                                                  .Find(TokenType::id, className, &classNameIdx)
+                                                  .Eat(TokenType::tok, "::")
+                                                  .Eat(TokenType::id, name)
+                                                  .Eat(TokenType::tok, "(", &openingParenIdx))
+                                        .FinishSearch();
+                if (classNameIdx == SIZE_T_MAX) {
+                    // Even the `className` token wasn't found, no need to backtrack.
+                    return std::unexpected(fmt::format(
+                        "Pattern <class-name>::<memfn-name> not found ({}::{})", className, name));
+                }
+                if (searchResult.has_value()) {
+                    // The `(` was also found.
+                    break;
+                }
+                // Backtract, start over from where the clasName was found.
+                tokens = tokens.subspan(classNameIdx + 1);
             }
-            // Also find ClassName::Function
+            if (openingParenIdx == SIZE_T_MAX) {
+                return std::unexpected(fmt::format("Can't find `(`"));
+            }
+            tokens = tokens.subspan(openingParenIdx + 1);
+            size_t openingBraceIdx = SIZE_T_MAX;
+            size_t closingBraceIdx1 = SIZE_T_MAX;
+            size_t closingBraceIdx2 = SIZE_T_MAX;
+            auto searchResult = std::move(TokenSearch(tokens)
+                                              .CloseBracket(')')
+                                              .Find(TokenType::tok, "{", &openingBraceIdx)
+                                              .CloseBracket('}', &closingBraceIdx1)
+                                              .GoToLast()
+                                              .Assert(TokenType::tok, "}", &closingBraceIdx2))
+                                    .FinishSearch();
+            if (!searchResult.has_value() || closingBraceIdx1 != closingBraceIdx2) {
+                return std::unexpected(
+                    fmt::format("Invalid memfn declaration ({})", searchResult.error()));
+            }
+            // Find the last noncomment before opening brace
+            CHECK(openingBraceIdx > 0);
+            size_t declarationBackIdx = openingBraceIdx - 1;
+            while (declarationBackIdx > 0 && tokens[declarationBackIdx].IsComment()) {
+                --declarationBackIdx;
+            }
+            CHECK(declarationBackIdx > 0);
+            auto declaration =
+                std::string_view(tokensFromFirstSpecialComment.front().sourceValue.data(),
+                                 data_plus_size(tokens[declarationBackIdx].sourceValue));
+            dependentProps.emplace(
+                std::in_place_index<std::to_underlying(EntityKind::memfn)>,
+                EntityDependentProperties::MemFn{.declaration = std::string(declaration),
+                                                 .declarationNeeds = std::move(result.needs),
+                                                 .definitionNeeds = std::move(result.defneeds)});
+#if 0
+			auto declUntilFirstOpeningBrace = TrimBeforeOpeningBrace(decl);
+			if (declUntilFirstOpeningBrace.empty()) {
+				return std::unexpected("No `{` found in member function definition.");
+			}
+			// Also find ClassName::Function
 #endif
-            break;
+        } break;
     }
     if (!allowed.fdneeds && !result.fdneeds.empty()) {
         return std::unexpected(fmt::format("`{}` entities can't have fdneeds, here we have: {}",
@@ -327,7 +383,13 @@ std::expected<std::monostate, std::string> ProcessSource(
 
     std::string name = path_to_string(sourcePath.stem());
 
-    TRY_ASSIGN(ep, ParsePreprocessedSource(name, pps));
+    if (!sourcePath.has_parent_path()) {
+        return std::unexpected(fmt::format("File {} has no parent path.", sourcePath));
+    }
+
+    std::string parentDirName = path_to_string(sourcePath.parent_path().stem());
+
+    TRY_ASSIGN(ep, ParsePreprocessedSource(name, pps, parentDirName));
     (void)ep;  // TODO
 #if 0
     auto f =
