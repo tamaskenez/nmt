@@ -3,6 +3,7 @@
 #ifdef LIBTOKENIZER
 #    include "libtokenizer.h"
 
+#    include <cassert>
 #    include <functional>
 #    include <string>
 #    include <utility>
@@ -29,8 +30,8 @@ class tokenizer_error : public std::runtime_error {
 inline void throw_tokenizer_error_if(
     bool cond, const char* file, int line, const char* func, const char* cond_string) {
     if (!cond) {
-        throw tokenizer_error(std::string(file) + ":" + std::to_string(line) + ": " + func
-                              + ": Assertion `" + cond_string + "` failed.");
+        throw tokenizer_error(std::string("Assertion failed: (") + cond_string + "), function "
+                              + func + ", file " + file + ", line " + std::to_string(line));
     }
 }
 
@@ -43,7 +44,6 @@ class Cout {
     void StartCapture(std::string_view source,
                       std::function<int()> currentSourceCharIdxFn,
                       Result* result) {
-        injector_assert(!capture);
         capture = Capture{.source = source,
                           .currentSourceCharIdxFn = std::move(currentSourceCharIdxFn),
                           .result = result};
@@ -104,8 +104,8 @@ class Cout {
 // TODO tokenizer writes to std::cerr, too.
 
 #ifdef LIBTOKENIZER
-thread_local inline Cout cout;
+thread_local extern Cout cout;
 #else
-inline std::ostream& cout = std::cout;
+extern std::ostream& cout = std::cout;
 #endif
 }  // namespace injector

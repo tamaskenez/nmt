@@ -22,6 +22,9 @@ struct Token {
     bool IsComment() const {
         return IsInlineComment() || IsBlockComment();
     }
+    bool IsSingleCharToken() const {
+        return type == TokenType::tok && value.size() == 1;
+    }
 };
 
 std::string_view to_string_view(TokenType t);

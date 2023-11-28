@@ -3,6 +3,13 @@
 #include <algorithm>
 
 namespace injector {
+
+#ifdef LIBTOKENIZER
+thread_local Cout cout;
+#else
+std::ostream& cout = std::cout;
+#endif
+
 namespace {
 std::string_view TrimRight(std::string_view sv) {
     while (!sv.empty() && std::isspace(sv.back())) {

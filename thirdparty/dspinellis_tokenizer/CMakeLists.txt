@@ -115,6 +115,7 @@ set(libtokenizer_sources
 	libtokenizer/injector.cpp
 )
 add_library(libtokenizer ${all_sources} ${libtokenizer_sources})
+add_library(libtokenizer::libtokenizer ALIAS libtokenizer)
 target_compile_definitions(libtokenizer PRIVATE LIBTOKENIZER)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${libtokenizer_sources})
 target_precompile_headers(libtokenizer PRIVATE libtokenizer/injector.h)

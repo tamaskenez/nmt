@@ -95,17 +95,24 @@ inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
         }                                                                           \
     } while (false)
 
+// Continue if no error, return unexpected otherwise:
+//
+//     TRY(<std::expected-rvalue>):
+//
+// Example usage:
+//
+//     TRY(foo()); // foo returns std::expected<std::monostate, E>
+//
+// Equivalent to
+//
+// auto tmp = foo();
+// if (!tmp) { return std::unexpected(std::move(tmp.error())); }
+//
 #define TRY(EXPECTED)                                     \
     _TRY_INTERNAL(EXPECTED,                               \
                   UTIL_PP_CONCAT(_tmp_var_, __COUNTER__), \
                   UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__))
 
-// Expands to sequence of statements, if mistakenly using as an if branch:
-//
-//     if(...) TRY_ASSIGN(a, b);
-//
-// will result in compiler error because the internal variable will be not in scope for the
-// assignment.
 #define _TRY_ASSIGN_INTERNAL(VAR, EXPECTED, TMP_VAR, TMP_VAR_TYPE) \
     auto&& TMP_VAR = (EXPECTED);                                   \
     static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);  \
@@ -117,6 +124,20 @@ inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
     }                                                              \
     auto&& VAR = std::move(*TMP_VAR)
 
+// Assign if no error, return unexpected otherwise:
+//
+//     TRY_ASSIGN(<variable-name>, <std::expected-rvalue>):
+//
+// Example usage:
+//
+//     TRY_ASSIGN(var, foo()); // foo returns std::expected<T, E>
+//
+// Equivalent to
+//
+// auto tmp = foo();
+// if (!tmp) { return std::unexpected(std::move(tmp.error())); }
+// auto&& var = std::move(*tmp);
+//
 #define TRY_ASSIGN(VAR, EXPECTED)                                \
     _TRY_ASSIGN_INTERNAL(VAR,                                    \
                          EXPECTED,                               \
@@ -135,6 +156,21 @@ inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
     }                                                                                             \
     auto&& VAR = std::move(*TMP_VAR)
 
+// Assign if no error, return unexpected otherwise:
+//
+//     TRY_ASSIGN_OR_UNEXPECTED(<var>, <std::expected-rvalue, args, ...):
+//     TRY_ASSIGN_OR_UNEXPECTED(<var>, <std::optional-rvalue, args, ...):
+//
+// Example usage:
+//
+//     TRY_ASSIGN(var, foo(), "failed");
+//
+// Equivalent to
+//
+// auto tmp = foo();
+// if (!tmp) { return std::unexpected(args...)); }
+// auto&& var = std::move(*tmp);
+//
 // __VA_ARGS__ are the arguments for std::unexpected()
 #define TRY_ASSIGN_OR_UNEXPECTED(VAR, EXPECTED_OR_OPTIONAL, ...)                    \
     _TRY_ASSIGN_OR_UNEXPECTED_INTERNAL(VAR,                                         \
@@ -147,6 +183,7 @@ inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
 #    define _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(VAR)
 #endif
 
+#if 0
 namespace detail {
 template<class T, class E>
 void or_fatal(std::expected<T, E>&& e) {
@@ -156,12 +193,14 @@ void or_fatal(std::expected<T, E>&& e) {
 }
 }  // namespace detail
 
-// Not a macro, still full-caps to stand out like the rest.
 template<class E>
 void TRY_OR_FATAL(std::expected<std::monostate, E>&& e) {
     detail::or_fatal(std::move(e));
 }
+#endif
 
+// Not a macro, still full-caps to stand out like the rest.
+// It's possible to implement these without a macro because we don't need to return.
 template<class T, class E>
 void TRY_OR_FATAL(std::expected<T, E>&& e)
 requires std::same_as<T, std::monostate>
@@ -178,6 +217,14 @@ requires(!std::same_as<T, std::monostate>)
     const bool panic = !e.has_value();
     _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(if (panic) { throw util_test_error(e.error()); })
     LOG_IF(FATAL, panic) << e.error();
+    return std::move(*e);
+}
+
+template<class T>
+[[nodiscard]] T TRY_OR_FATAL(std::optional<T>&& e) {
+    const bool panic = !e.has_value();
+    _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(if (panic) { throw util_test_error("<nullopt>"); })
+    LOG_IF(FATAL, panic) << "Accessing value of <nullopt>.";
     return std::move(*e);
 }
 

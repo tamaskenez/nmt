@@ -1,4 +1,6 @@
-find_package(libtokenizer REQUIRED)
+if(NOT TARGET libtokenizer::libtokenizer)
+	find_package(libtokenizer REQUIRED)
+endif()
 
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS *.cpp *.h)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sources})

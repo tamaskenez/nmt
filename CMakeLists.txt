@@ -19,6 +19,9 @@ find_package(absl REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(fmt REQUIRED)
 
+# Adding before setting strict warning options.
+add_subdirectory(thirdparty/dspinellis_tokenizer)
+
 set(WARNINGS_AS_ERRORS 1)
 include(cmake/cpp_warnings.cmake)
 add_compile_options(${PROJECT_WARNING_FLAGS})

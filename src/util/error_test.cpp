@@ -61,6 +61,15 @@ value_type exi_assign_or_fatal(bool ok) {
     return x;
 }
 
+value_type opi_assign_or_fatal(bool ok) {
+    statementReached = StatementReached::no;
+    auto value = std::make_unique<int>(k_okInt);
+    auto x = TRY_OR_FATAL(ok ? OPI(std::move(value)) : OPI());
+    static_assert(std::is_same_v<std::decay_t<decltype(x)>, value_type>);
+    statementReached = StatementReached::yes;
+    return x;
+}
+
 }  // namespace
 
 TEST(error, TRY_ok) {
@@ -126,6 +135,24 @@ TEST(error, nonvoid_TRY_OR_FATAL_error) {
     } catch (const util_test_error& e) {
         ASSERT_EQ(statementReached, StatementReached::no);
         ASSERT_EQ(e.what(), k_errorString);
+    }
+}
+
+TEST(error, nonvoid_TRY_OR_FATAL_optional_ok) {
+    statementReached.reset();
+    auto r = opi_assign_or_fatal(true);
+    ASSERT_EQ(*r, k_okInt);
+    ASSERT_EQ(statementReached, StatementReached::yes);
+}
+
+TEST(error, nonvoid_TRY_OR_FATAL_optional_error) {
+    try {
+        statementReached.reset();
+        opi_assign_or_fatal(false);
+        FAIL();
+    } catch (const util_test_error& e) {
+        ASSERT_EQ(statementReached, StatementReached::no);
+        ASSERT_STREQ(e.what(), "<nullopt>");
     }
 }
 

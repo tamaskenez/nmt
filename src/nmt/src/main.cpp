@@ -209,10 +209,9 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                               .Eat(TokenType::kw, "enum", &enumIdx)
                                               .Find(TokenType::id, name)
                                               .Find(TokenType::tok, "{", &openingBraceIdx)
-                                              .GoToLast()
-                                              .Assert(TokenType::tok, ";")
-                                              .GoToPrevious()
-                                              .Assert(TokenType::tok, "}"))
+                                              .Eat(TokenType::tok, "}")
+                                              .Eat(TokenType::tok, "}")
+                                              .AssertEnd())
                                     .FinishSearch();
             if (!searchResult.has_value()) {
                 return std::unexpected(
@@ -252,16 +251,29 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                        .declarationNeeds = std::move(result.needs)});
 #endif
             break;
-        case EntityKind::class_:
+        case EntityKind::class_: {
             allowed.fdneeds = true;
             allowed.needs = true;
+            // Expected: ... class ... name ... { ... } ;
+            size_t openingBraceIdx = SIZE_T_MAX;
+            auto searchResult = std::move(TokenSearch(tokensFromFirstSpecialComment)
+                                              .Find(TokenType::kw, "class")
+                                              .Find(TokenType::id, name)
+                                              .Find(TokenType::tok, "{", &openingBraceIdx)
+                                              .Eat(TokenType::tok, "}")
+                                              .AssertEnd())
+                                    .FinishSearch();
+            if (!searchResult.has_value()) {
+                return std::unexpected(
+                    fmt::format("Invalid enum declaration ({})", searchResult.error()));
+            }
 #if 0
-            dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
-                                   EntityDependentProperties::StructOrClass{
-                                       .forwardDeclarationNeeds = std::move(result.fdneeds),
-                                       .declarationNeeds = std::move(result.needs)});
+			dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
+								   EntityDependentProperties::StructOrClass{
+				.forwardDeclarationNeeds = std::move(result.fdneeds),
+				.declarationNeeds = std::move(result.needs)});
 #endif
-            break;
+        } break;
         case EntityKind::using_: {
             allowed.needs = true;
 #if 0
@@ -309,18 +321,16 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
             if (openingParenIdx == SIZE_T_MAX) {
                 return std::unexpected(fmt::format("Can't find `(`"));
             }
-            tokens = tokens.subspan(openingParenIdx + 1);
+            tokens = tokens.subspan(openingParenIdx);
             size_t openingBraceIdx = SIZE_T_MAX;
-            size_t closingBraceIdx1 = SIZE_T_MAX;
-            size_t closingBraceIdx2 = SIZE_T_MAX;
             auto searchResult = std::move(TokenSearch(tokens)
-                                              .CloseBracket(')')
+                                              .Eat(TokenType::tok, "(")
+                                              .Eat(TokenType::tok, ")")
                                               .Find(TokenType::tok, "{", &openingBraceIdx)
-                                              .CloseBracket('}', &closingBraceIdx1)
-                                              .GoToLast()
-                                              .Assert(TokenType::tok, "}", &closingBraceIdx2))
+                                              .Eat(TokenType::tok, "}")
+                                              .AssertEnd())
                                     .FinishSearch();
-            if (!searchResult.has_value() || closingBraceIdx1 != closingBraceIdx2) {
+            if (!searchResult.has_value()) {
                 return std::unexpected(
                     fmt::format("Invalid memfn declaration ({})", searchResult.error()));
             }
