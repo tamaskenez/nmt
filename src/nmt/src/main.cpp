@@ -210,7 +210,7 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                               .Find(TokenType::id, name)
                                               .Find(TokenType::tok, "{", &openingBraceIdx)
                                               .Eat(TokenType::tok, "}")
-                                              .Eat(TokenType::tok, "}")
+                                              .Eat(TokenType::tok, ";")
                                               .AssertEnd())
                                     .FinishSearch();
             if (!searchResult.has_value()) {
@@ -254,34 +254,93 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         case EntityKind::class_: {
             allowed.fdneeds = true;
             allowed.needs = true;
-            // Expected: ... class ... name ... { ... } ;
-            size_t openingBraceIdx = SIZE_T_MAX;
-            auto searchResult = std::move(TokenSearch(tokensFromFirstSpecialComment)
-                                              .Find(TokenType::kw, "class")
-                                              .Find(TokenType::id, name)
-                                              .Find(TokenType::tok, "{", &openingBraceIdx)
-                                              .Eat(TokenType::tok, "}")
-                                              .AssertEnd())
-                                    .FinishSearch();
-            if (!searchResult.has_value()) {
-                return std::unexpected(
-                    fmt::format("Invalid enum declaration ({})", searchResult.error()));
+            // Expected: ... `class` attributes-opt name (`:` ...)? `{` ... `}` `;`
+            auto tokensForSearchClass = tokensFromFirstSpecialComment;
+            auto assertValid = [](size_t x) {
+                CHECK(x != SIZE_T_MAX);
+                return x;
+            };
+            for (size_t classIdx = SIZE_T_MAX;;
+                 tokensForSearchClass = tokensForSearchClass.subspan(assertValid(classIdx) + 1),
+                        classIdx = SIZE_T_MAX) {
+                auto searchResult =
+                    std::move(
+                        TokenSearch(tokensForSearchClass).Find(TokenType::kw, "class", &classIdx))
+                        .FinishSearch();
+                if (!searchResult) {
+                    return std::unexpected(
+                        fmt::format("`class` not found: {}", searchResult.error()));
+                }
+                assert(classIdx != SIZE_T_MAX);
+                auto tokensForSearchOpenBracket = tokensForSearchClass.subspan(classIdx + 1);
+                // Get past the optional attributes.
+                for (size_t startBracketIdx = SIZE_T_MAX;;
+                     tokensForSearchOpenBracket =
+                         tokensForSearchOpenBracket.subspan(startBracketIdx + 1)) {
+                    size_t endBracketIdx = SIZE_T_MAX;
+                    searchResult = std::move(TokenSearch(tokensForSearchOpenBracket)
+                                                 .Eat(TokenType::tok, "[", &startBracketIdx)
+                                                 .Eat(TokenType::tok, "]", &endBracketIdx))
+                                       .FinishSearch();
+                    if (searchResult) {
+                        // Both [ and ] found.
+                        assert(startBracketIdx != SIZE_T_MAX);
+                        assert(endBracketIdx != SIZE_T_MAX);
+                        // Continue after ]
+                        continue;
+                    } else {
+                        if (startBracketIdx != SIZE_T_MAX) {
+                            // [ was found without ], error.
+                            assert(endBracketIdx == SIZE_T_MAX);
+                            return std::unexpected("Mismatched [ and ]");
+                        }
+                        // No brackets found, continue with name.
+                        break;
+                    }
+                }
+                auto tokenForSearchName = tokensForSearchOpenBracket;
+                size_t nameIdx = SIZE_T_MAX;
+                auto search = TokenSearch(tokenForSearchName).Eat(TokenType::id, name, &nameIdx);
+                if (nameIdx == SIZE_MAX) {
+                    continue;
+                }
+                size_t colonIdx = SIZE_T_MAX;
+                search.EatOptional(TokenType::kw, "final")
+                    .EatOptional(TokenType::tok, ":", &colonIdx);
+                size_t openingBraceIdx = SIZE_T_MAX;
+                if (colonIdx == SIZE_T_MAX) {
+                    search.Eat(TokenType::tok, "{", &openingBraceIdx);
+                } else {
+                    search.Find(TokenType::tok, "{", &openingBraceIdx);
+                }
+                if (openingBraceIdx == SIZE_T_MAX) {
+                    return std::unexpected("class declaration not found.");
+                }
+                size_t closingBraceIdx = SIZE_T_MAX;
+                search.Eat(TokenType::tok, "}", &closingBraceIdx);
+                if (closingBraceIdx == SIZE_T_MAX) {
+                    return std::unexpected("`}` not found.");
+                }
+                size_t closingSemicolonIdx = SIZE_T_MAX;
+                search.Eat(TokenType::tok, ";", &closingSemicolonIdx);
+                if (closingSemicolonIdx == SIZE_T_MAX) {
+                    return std::unexpected("Closing `;` not found.");
+                }
+                break;
             }
-#if 0
-			dependentProps.emplace(std::in_place_index<std::to_underlying(class_)>,
-								   EntityDependentProperties::StructOrClass{
-				.forwardDeclarationNeeds = std::move(result.fdneeds),
-				.declarationNeeds = std::move(result.needs)});
-#endif
+
+            dependentProps.emplace(std::in_place_index<std::to_underlying(EntityKind::class_)>,
+                                   EntityDependentProperties::StructOrClass{
+                                       .forwardDeclaration = fmt::format("class {};", name),
+                                       .forwardDeclarationNeeds = std::move(result.fdneeds),
+                                       .declarationNeeds = std::move(result.needs)});
         } break;
         case EntityKind::using_: {
             allowed.needs = true;
-#if 0
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(using_)>,
                 EntityDependentProperties::Using{.declaration = CompactSpaces(decl),
                                                  .declarationNeeds = std::move(result.needs)});
-#endif
         } break;
         case EntityKind::inlvar:
             allowed.needs = true;
@@ -307,7 +366,8 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                                   .Eat(TokenType::tok, "(", &openingParenIdx))
                                         .FinishSearch();
                 if (classNameIdx == SIZE_T_MAX) {
-                    // Even the `className` token wasn't found, no need to backtrack.
+                    // Even the `className` token wasn't found, no need to
+                    // backtrack.
                     return std::unexpected(fmt::format(
                         "Pattern <class-name>::<memfn-name> not found ({}::{})", className, name));
                 }
@@ -688,8 +748,8 @@ int main(int argc, char* argv[]) {
                                           .declarationNeeds);
                     break;
                 case EntityKind::memfn:
-                    CHECK(false);  // TODO this is not true, memfn's declaration needs go to the
-                                   // class/struct header.
+                    CHECK(false);  // TODO this is not true, memfn's declaration
+                                   // needs go to the class/struct header.
                     addNeedsAsHeaders(std::get<EntityDependentProperties::MemFn>(e.dependentProps)
                                           .declarationNeeds);
                     break;
@@ -722,8 +782,9 @@ int main(int argc, char* argv[]) {
                                 k_nmtIncludeMemberDeclarationsMacro);
                 break;
             case EntityKind::memfn:
-                CHECK(false);  // TODO this is not true, memfn declaration goes to the member
-                               // function declaration file which gets injected with a macro.
+                CHECK(false);  // TODO this is not true, memfn declaration goes to
+                               // the member function declaration file which gets
+                               // injected with a macro.
                 headerContent += fmt::format(
                     "{};\n", std::get<EntityDependentProperties::Fn>(e.dependentProps).declaration);
                 break;

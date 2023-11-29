@@ -36,6 +36,27 @@ class TokenSearch {
         }
         return *this;
     }
+    TokenSearch& EatOptional(TokenType tokenType, std::string_view text, size_t* idx = nullptr) {
+        if (!nextIdxOrError) {
+            return *this;
+        }
+        auto previousIdx = *nextIdxOrError;
+        if (auto e = AdvanceToNext(); !e) {
+            FailWith(e.error());
+            return *this;
+        }
+        auto& nextIdx = *nextIdxOrError;
+        assert(nextIdx < tokens.size());
+        auto& t = tokens[nextIdx];
+        if (t.type == tokenType && t.sourceValue == text) {
+            if (idx) {
+                *idx = nextIdx;
+            }
+        } else {
+            nextIdxOrError = previousIdx;
+        }
+        return *this;
+    }
     // Find next specified token then advance to the next after that.
     TokenSearch& Find(TokenType tokenType, std::string_view text, size_t* idx = nullptr) {
         if (!nextIdxOrError) {
