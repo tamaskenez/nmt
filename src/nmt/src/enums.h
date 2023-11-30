@@ -1,13 +1,12 @@
 #pragma once
 
-enum class EntityKind { enum_, fn, struct_, class_, using_, inlvar, memfn };
+enum class EntityKind { enum_, fn, struct_, class_, header, memfn };
 template<>
 struct enum_traits<EntityKind> {
     using enum EntityKind;
-    static constexpr std::array<EntityKind, 7> elements{
-        enum_, fn, struct_, class_, using_, inlvar, memfn};
+    static constexpr std::array<EntityKind, 6> elements{enum_, fn, struct_, class_, header, memfn};
     static constexpr std::array<std::string_view, elements.size()> names{
-        "enum", "fn", "struct", "class", "using", "inlvar", "memfn"};
+        "enum", "fn", "struct", "class", "header", "memfn"};
 };
 
 enum class Visibility { public_, target };

@@ -19,6 +19,8 @@ using flat_hash_set = std::unordered_set<K, H>;
 struct SpecialComment {
     std::string_view keyword;  // Points into the original source text.
     std::vector<std::string_view> list;
+    bool trailingComma =
+        false;  // Used only when parsing, one specialcomment can continue in the next line.
 };
 struct PreprocessedSource {
     std::vector<SpecialComment> specialComments;
@@ -47,13 +49,8 @@ struct StructOrClass {
     std::vector<std::string> forwardDeclarationNeeds, declarationNeeds;
     flat_hash_map<std::string, MemberFunction> memberFunctions;
 };
-struct Using {
-    // The source file contains the type-alias or alias-template declaration
-    std::string declaration;
-    std::vector<std::string> declarationNeeds;
-};
-struct InlVar {
-    // The source file contains the inline/constexpr variable declaration.
+struct Header {
+    // The source file contains a header-only entity, like type alias (using) or inline variable.
     std::vector<std::string> declarationNeeds;
 };
 struct MemFn {
@@ -61,7 +58,7 @@ struct MemFn {
     // The source file contains the function-definition.
     std::vector<std::string> declarationNeeds, definitionNeeds;
 };
-using V = std::variant<Enum, Fn, StructOrClass, StructOrClass, Using, InlVar, MemFn>;
+using V = std::variant<Enum, Fn, StructOrClass, StructOrClass, Header, MemFn>;
 // Make sure V's alternatives correspond to EntityKind values.
 // This function doesn't need to be called, it asserts in comptime.
 inline void AssertVariantIndices(EntityKind k) {
@@ -76,8 +73,7 @@ inline void AssertVariantIndices(EntityKind k) {
         CHECK_ALTERNATIVE(fn, Fn);
         CHECK_ALTERNATIVE(struct_, StructOrClass);
         CHECK_ALTERNATIVE(class_, StructOrClass);
-        CHECK_ALTERNATIVE(using_, Using);
-        CHECK_ALTERNATIVE(inlvar, InlVar);
+        CHECK_ALTERNATIVE(header, Header);
         CHECK_ALTERNATIVE(memfn, MemFn);
 #undef CHECK_ALTERNATIVE
     }
@@ -93,8 +89,7 @@ inline V Make(EntityKind k) {
         MAKE_ALTERNATIVE(fn);
         MAKE_ALTERNATIVE(struct_);
         MAKE_ALTERNATIVE(class_);
-        MAKE_ALTERNATIVE(using_);
-			MAKE_ALTERNATIVE(inlvar);
+        MAKE_ALTERNATIVE(header);
 			MAKE_ALTERNATIVE(memfn);
 #    undef MAKE_ALTERNATIVE
     }
@@ -117,7 +112,7 @@ struct Entity {
     }
     // The file which is injected into a class/struct declaration.
     std::string MemberDeclarationsFilename() const {
-        return fmt::format("{}_member_declarations.h", name);
+        return fmt::format("{}#member_declarations.h", name);
     }
     std::string DefinitionFilename() const {
         return fmt::format("{}.cpp", name);
@@ -143,10 +138,7 @@ struct Entity {
                 fmt::print("needs: {}\n", fmt::join(x.declarationNeeds, ", "));
                 fmt::print("{} member functions\n", x.memberFunctions.size());
             },
-            [](const EntityDependentProperties::Using& x) {
-                fmt::print("needs: {}\n", fmt::join(x.declarationNeeds, ", "));
-            },
-            [](const EntityDependentProperties::InlVar& x) {
+            [](const EntityDependentProperties::Header& x) {
                 fmt::print("needs: {}\n", fmt::join(x.declarationNeeds, ", "));
             },
             [](const EntityDependentProperties::MemFn& x) {
@@ -176,8 +168,7 @@ struct Entity {
                 return &std::get<std::to_underlying(class_)>(dependentProps)
                             .forwardDeclarationNeeds;
             case fn:
-            case using_:
-            case inlvar:
+            case header:
             case memfn:
                 return nullptr;
         }
@@ -192,8 +183,7 @@ struct Entity {
             case class_:
                 return std::get<std::to_underlying(class_)>(dependentProps).forwardDeclaration;
             case fn:
-            case using_:
-            case inlvar:
+            case header:
             case memfn:
                 LOG(FATAL) << fmt::format("Entity {} has no forward declaration",
                                           enum_name(GetEntityKind()));

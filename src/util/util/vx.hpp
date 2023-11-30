@@ -51,11 +51,10 @@ inline constexpr at_t<I> at;
 template<typename T, size_t I>
 #if defined __cpp_concepts && __cplusplus >= __cpp_concepts
 requires requires(T object) {
-             { std::get<I>(object) };
-         }
+    { std::get<I>(object) };
+}
 #endif
-decltype(auto)
-operator|(T&& v, at_t<I>) {
+decltype(auto) operator|(T&& v, at_t<I>) {
     return std::get<I>(std::forward<T>(v));
 }
 

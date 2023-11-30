@@ -14,12 +14,16 @@ std::unordered_set<std::string_view> SpecialCommentKeywords() {
 const std::unordered_set<std::string_view> k_specialCommentKeywords = SpecialCommentKeywords();
 
 // Eats EOL, too.
-std::expected<std::pair<std::vector<std::string_view>, std::string_view>, std::string>
-TryEatCommaSeparatedListPossiblyMultiline(std::string_view sv) {
+struct TryEatCommaSeparateListResult {
+    std::vector<std::string_view> items;
+    bool trailingComma = false;
+};
+std::expected<TryEatCommaSeparateListResult, std::string> TryEatCommaSeparatedList(
+    std::string_view sv) {
     // Read comma-separated list.
     std::vector<std::string_view> items;
+    sv = EatBlank(sv);
     for (;;) {
-        sv = EatBlank(sv);
         if (sv.empty()) {
             break;
         }
@@ -45,68 +49,48 @@ TryEatCommaSeparatedListPossiblyMultiline(std::string_view sv) {
         // After a list item we expect:
         // - comma
         // - empty
-        // - newline
-        if (sv.empty() || sv.front() == '\n') {
-            if (sv.front() == '\n') {
-                sv.remove_prefix(1);
-            }
+        if (sv.empty()) {
             break;
+        } else if (sv.front() != ',') {
+            return std::unexpected(fmt::format("Invalid text in comma-separated list: {}", sv));
         }
-        if (sv.front() != ',') {
-            return std::unexpected("missing comma in list");
-        }
-        sv.remove_prefix(1);
-        // After the comma, the list can continue here or on the next line.
+        sv.remove_prefix(1);  // Eat comma.
         sv = EatBlank(sv);
         if (sv.empty()) {
-            return std::unexpected("Trailing comma is not permitted.");
+            return TryEatCommaSeparateListResult{.items = std::move(items), .trailingComma = true};
         }
-        if (sv.front() != '\n') {
-            continue;  // List continues on this line.
-        }
-        // List must continue on next line.
-        sv.remove_prefix(1);
-        auto restOr = TryEatPrefix(EatBlank(sv), "//");
-        if (!restOr) {
-            return std::unexpected(
-                "Missing `//`: after a trailing comma the list should continue on the next line.");
-        }
-        sv = *restOr;
     }
-    return std::make_pair(std::move(items), sv);
+    return TryEatCommaSeparateListResult{.items = std::move(items), .trailingComma = false};
 }
 
-std::expected<SpecialComment, std::string> TryEatSpecialComment(std::string_view sv) {
-    sv = trim(sv);
-    auto afterSlashSlash = TryEatPrefix(sv, "//");
-    if (!afterSlashSlash) {
-        return std::unexpected(std::string());
-    }
-    auto afterPound = TryEatPrefix(EatBlank((*afterSlashSlash)), "#");
-    if (!afterPound) {
-        return std::unexpected(std::string());
-    }
-    auto symbolAndRestOr = TryEatCSymbol(*afterPound);
-    if (!symbolAndRestOr) {
-        return std::unexpected(std::string());
-    }
+std::expected<SpecialComment, std::string> TryEatSpecialCommentAfterSlashSlash(
+    std::string_view sv, bool previousShouldContinue) {
     std::string_view keyword;
-    std::tie(keyword, sv) = *symbolAndRestOr;
-    if (!k_specialCommentKeywords.contains(keyword)) {
-        return std::unexpected(std::string());  // Not an error but not a special comment.
+    if (!previousShouldContinue) {
+        auto afterPound = TryEatPrefix(EatBlank(sv), "#");
+        if (!afterPound) {
+            return std::unexpected(std::string());
+        }
+        auto symbolAndRestOr = TryEatCSymbol(*afterPound);
+        if (!symbolAndRestOr) {
+            return std::unexpected(std::string());
+        }
+        std::tie(keyword, sv) = *symbolAndRestOr;
+        if (!k_specialCommentKeywords.contains(keyword)) {
+            return std::unexpected(std::string());  // Not an error but not a special comment.
+        }
+        if (sv.empty()) {
+            // Special comment without list
+            return SpecialComment{.keyword = keyword};
+        }
+        if (sv.front() != ':') {
+            return std::unexpected("Invalid character after special comment.");
+        }
+        sv.remove_prefix(1);
     }
-    if (sv.empty()) {
-        // Special comment without list
-        return SpecialComment{.keyword = keyword};
-    }
-    if (sv.front() != ':') {
-        return std::unexpected("Invalid character after special comment.");
-    }
-    sv.remove_prefix(1);
-    auto listAndRestOr = TryEatCommaSeparatedListPossiblyMultiline(sv);
-    if (!listAndRestOr) {
-        return std::unexpected(listAndRestOr.error());
-    }
+    TRY_ASSIGN(listResult, TryEatCommaSeparatedList(sv));
 
-    return SpecialComment{.keyword = keyword, .list = listAndRestOr->first};
+    return SpecialComment{.keyword = keyword,
+                          .list = std::move(listResult.items),
+                          .trailingComma = listResult.trailingComma};
 }

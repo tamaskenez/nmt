@@ -9,15 +9,24 @@
 std::expected<PreprocessedSource, std::string> PreprocessSource(std::string_view sv) {
     TRY_ASSIGN(tokens, libtokenizer::process_cpp_with_option_B(sv));
     std::vector<SpecialComment> specialComments;
+    bool previousShouldContinue = false;
     for (auto& t : tokens.tokens) {
         if (!t.IsInlineComment()) {
             continue;
         }
         CHECK(t.sourceValue.starts_with("//"));
-        auto specialCommentAndRestOr = TryEatSpecialComment(t.sourceValue);
+        auto specialCommentAndRestOr =
+            TryEatSpecialCommentAfterSlashSlash(t.sourceValue.substr(2), previousShouldContinue);
         if (specialCommentAndRestOr) {
             // Valid special comment.
-            specialComments.push_back(std::move(*specialCommentAndRestOr));
+            if (previousShouldContinue) {
+                auto& back = specialComments.back();
+                append_range(back.list, std::move(specialCommentAndRestOr->list));
+                back.trailingComma = specialCommentAndRestOr->trailingComma;
+            } else {
+                specialComments.push_back(std::move(*specialCommentAndRestOr));
+            }
+            previousShouldContinue = specialComments.back().trailingComma;
         } else if (!specialCommentAndRestOr.error().empty()) {
             // Error.
             return std::unexpected(std::move(specialCommentAndRestOr.error()));

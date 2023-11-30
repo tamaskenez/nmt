@@ -2,4 +2,5 @@
 
 #include "data.h"
 
-std::expected<SpecialComment, std::string> TryEatSpecialComment(std::string_view sv);
+std::expected<SpecialComment, std::string> TryEatSpecialCommentAfterSlashSlash(
+    std::string_view sv, bool previousShouldContinue);

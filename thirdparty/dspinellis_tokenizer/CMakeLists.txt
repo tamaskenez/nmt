@@ -12,23 +12,31 @@ macro(execute_perl)
 endmacro()
 
 # Clone github/dspinellis/tokenizer.
-include(FetchContent)
-FetchContent_Declare(tokenizer
-	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tokenizer
-	GIT_REPOSITORY "https://github.com/dspinellis/tokenizer.git"
-)
-message(STATUS "FetchContent_MakeAvailable(tokenizer)...")
-FetchContent_MakeAvailable(tokenizer)
+set(tokenizer_dir ${CMAKE_CURRENT_SOURCE_DIR}/tokenizer)
+set(tokenizer_git_url "https://github.com/dspinellis/tokenizer.git")
+if(EXISTS ${tokenizer_dir})
+	if(NOT IS_DIRECTORY ${tokenizer_dir})
+		message(FATAL_ERROR "Expected to be a directory: ${tokenizer_dir}")
+	endif()
+	message(STATUS "Not cloning tokenizer, directory already exists")
+else()
+	execute_process(COMMAND ${GIT_EXECUTABLE}
+		clone ${tokenizer_git_url} ${tokenizer_dir}
+		COMMAND_ECHO STDOUT
+		COMMAND_ERROR_IS_FATAL ANY
+	)
+endif()
 
-set(src ${CMAKE_CURRENT_SOURCE_DIR}/tokenizer/src)
+set(src ${tokenizer_dir}/src)
 
 # Check if the original sources are already modified.
+message(STATUS "git diff origin/head --exit-code WORKING_DIRECTORY ${tokenizer_dir}")
 execute_process(COMMAND ${GIT_EXECUTABLE} diff origin/head --exit-code
 	OUTPUT_QUIET
 	OUTPUT_VARIABLE git_output
 	ERROR_VARIABLE git_error
 	RESULT_VARIABLE git_result
-	WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/tokenizer	
+	WORKING_DIRECTORY ${tokenizer_dir}
 )
 
 if(git_result EQUAL 0)

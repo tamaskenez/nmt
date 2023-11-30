@@ -24,3 +24,44 @@ TEST(stlext, path_to_string_and_back) {
     auto string = path_to_string(path);
     ASSERT_EQ(string, input_string_view);
 }
+
+TEST(stlext, append_range_copy) {
+    const std::vector<int> u = {1, 2, 3};
+    std::vector<int> v = {4, 5};
+    append_range(v, u);
+    ASSERT_EQ(v, std::vector<int>({4, 5, 1, 2, 3}));
+}
+
+struct MoveOnly {
+    MoveOnly() = default;
+    explicit MoveOnly(int i)
+        : i(i) {}
+    MoveOnly(const MoveOnly&) = default;
+    MoveOnly(MoveOnly&& y)
+        : i(y.i) {
+        y.i += 100;
+    }
+    MoveOnly& operator=(const MoveOnly&) = default;
+    MoveOnly& operator=(MoveOnly&& y) {
+        i = y.i;
+        y.i += 100;
+        return *this;
+    }
+    bool operator<=>(const MoveOnly&) const = default;
+    int i = 0;
+};
+
+TEST(stlext, append_range_move) {
+    std::vector<MoveOnly> u;
+    u.push_back(MoveOnly{1});
+    u.push_back(MoveOnly{2});
+    u.push_back(MoveOnly{3});
+    std::vector<MoveOnly> v;
+    v.push_back(MoveOnly{4});
+    v.push_back(MoveOnly{5});
+    append_range(v, std::move(u));
+    ASSERT_EQ(
+        v,
+        std::vector<MoveOnly>({MoveOnly{4}, MoveOnly{5}, MoveOnly{1}, MoveOnly{2}, MoveOnly{3}}));
+    ASSERT_EQ(u, std::vector<MoveOnly>({MoveOnly{101}, MoveOnly{102}, MoveOnly{103}}));
+}
