@@ -6,8 +6,6 @@ namespace injector {
 
 #ifdef LIBTOKENIZER
 thread_local Cout cout;
-#else
-std::ostream& cout = std::cout;
 #endif
 
 namespace {

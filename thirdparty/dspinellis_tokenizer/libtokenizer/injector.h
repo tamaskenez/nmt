@@ -104,8 +104,8 @@ class Cout {
 // TODO tokenizer writes to std::cerr, too.
 
 #ifdef LIBTOKENIZER
-thread_local extern Cout cout;
+extern thread_local Cout cout;
 #else
-extern std::ostream& cout = std::cout;
+inline std::ostream& cout = std::cout;
 #endif
 }  // namespace injector

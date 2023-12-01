@@ -1,3 +1,3 @@
-if(BUILD_ALL)
+if(BUILD_FULL)
 	add_subdirectory(allfeatures)
 endif()

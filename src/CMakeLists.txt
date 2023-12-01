@@ -1,10 +1,8 @@
 add_subdirectory(util)
 
-if(BUILD_NMT)
-	add_subdirectory(nmt)
-endif()
+add_subdirectory(nmt)
 
-if(BUILD_ALL)
+if(BUILD_FULL)
 	add_subdirectory(helloqt)
 	add_subdirectory(common)
 	add_subdirectory(nmtapp) # uses common
