@@ -117,6 +117,10 @@ struct Entity {
     std::string DefinitionFilename() const {
         return fmt::format("{}.cpp", name);
     }
+    std::string MemFnClassName() const {
+        CHECK(GetEntityKind() == EntityKind::memfn);
+        return path_to_string(path.parent_path().filename());
+    }
 
     void Print() {
         fmt::print("entityKind: {}\n", enum_name(GetEntityKind()));

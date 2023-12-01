@@ -8,7 +8,9 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
+#include <version>
 
 // WARNING: error prone hacky macro, x must be a variable.
 // If it's a function it will be invoked twice. Which is a performance issue for pure functions and
@@ -57,3 +59,27 @@ void append_range(std::vector<T>& v, R&& rg) {
              std::make_move_iterator(std::move(rg).begin()),
              std::make_move_iterator(std::move(rg).end()));
 }
+
+template<class R, class T>
+std::optional<R> try_convert_integer(T t) {
+    if (std::in_range<R>(t)) {
+        return R(t);
+    }
+    return std::nullopt;
+}
+
+inline bool shallow_equal(std::string_view x, std::string_view y) {
+    return x.data() == y.data() && x.size() == y.size();
+}
+
+#if !defined __cpp_lib_ranges_contains || __cpp_lib_ranges_contains == 0
+namespace std::ranges {
+template<std::ranges::input_range R, class T, class Proj = std::identity>
+requires std::indirect_binary_predicate<std::ranges::equal_to,
+                                        std::projected<std::ranges::iterator_t<R>, Proj>,
+                                        const T*>
+constexpr bool contains(R&& r, const T& value, Proj proj = {}) {
+    return std::ranges::find(r, value, proj) != std::ranges::end(r);
+}
+}  // namespace std::ranges
+#endif
