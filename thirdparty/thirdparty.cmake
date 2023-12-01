@@ -1,5 +1,7 @@
 set(ABSL_GIT_REPOSITORY https://github.com/abseil/abseil-cpp)
-set(GTEST_GIT_REPOSITORY https://github.com/google/googletest.git)
+#set(GTEST_GIT_REPOSITORY https://github.com/google/googletest.git)
+set(GTEST_GIT_REPOSITORY https://github.com/tamaskenez/googletest.git)
+set(GTEST_GIT_BRANCH cmake_external_absl_re2)
 set(RE2_GIT_REPOSITORY https://github.com/google/re2.git)
 
 if(NOT CMAKE_INSTALL_PREFIX)
@@ -27,9 +29,13 @@ endmacro()
 foreach(project ABSL RE2 GTEST)
     set(s ${BUILD_DIR}/${project}/s)
     if(NOT IS_DIRECTORY ${s})
+        if(DEFINED ${project}_GIT_BRANCH)
+            set(git_branch_option --branch ${${project}_GIT_BRANCH})
+        endif()
         execute_process(
             COMMAND ${GIT_EXECUTABLE}
-                clone --depth 1 ${${project}_GIT_REPOSITORY} ${s}
+                clone --depth 1 ${git_branch_option}
+                    ${${project}_GIT_REPOSITORY} ${s}
             COMMAND_ERROR_IS_FATAL ANY
         )
     else()
@@ -37,7 +43,7 @@ foreach(project ABSL RE2 GTEST)
     endif()
 endforeach()
 
-foreach(project ABSL RE2 GTEST dspinellis_tokenizer)
+foreach(project ABSL RE2 GTEST) # dspinellis_tokenizer is moved into the main project.
     if(project STREQUAL dspinellis_tokenizer)
         set(s ${CMAKE_CURRENT_LIST_DIR}/dspinellis_tokenizer)
     else()
@@ -48,6 +54,7 @@ foreach(project ABSL RE2 GTEST dspinellis_tokenizer)
         -D CMAKE_BUILD_TYPE=Debug
         -D CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
         -D CMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}
+        -D BUILD_SHARED_LIBS=0
         -D CMAKE_DEBUG_POSTFIX=_d
         -D CMAKE_CXX_STANDARD=23
         -D CMAKE_CXX_STANDARD_REQUIRED=1

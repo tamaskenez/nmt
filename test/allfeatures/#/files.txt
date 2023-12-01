@@ -1,7 +1,0 @@
-Enum.h
-Function.h
-kThree.h
-Class.h
-Struct.h
-EnumUnderlyingType.h
-Class/mf.h
