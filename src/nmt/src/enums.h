@@ -24,7 +24,7 @@ struct enum_traits<SpecialCommentKeyword> {
     static constexpr std::array<SpecialCommentKeyword, 4> elements{
         fdneeds, needs, defneeds, visibility};
     static constexpr std::array<std::string_view, elements.size()> names{
-		"fdneeds",   // forward-declaration (and opaque-enum-declaration) needs
+        "fdneeds",   // forward-declaration (and opaque-enum-declaration) needs
         "needs",     // declaration needs
         "defneeds",  // definition needs
         "visibility"};

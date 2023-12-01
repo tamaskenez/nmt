@@ -858,7 +858,7 @@ int main(int argc, char* argv[]) {
                     CHECK(false);
                     break;
             }
-			
+
             fmt::print("Processed {} from {}\n", e.name, e.path);
             gfw.Write(e.HeaderFilename(), headerContent);
         }
