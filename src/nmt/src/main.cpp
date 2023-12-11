@@ -833,7 +833,7 @@ int main(int argc, char* argv[]) {
                     break;
                 case EntityKind::fn:
                     headerContent += fmt::format(
-                        "{};\n",
+                        "{}\n",
                         std::get<EntityDependentProperties::Fn>(e.dependentProps).declaration);
                     break;
                 case EntityKind::struct_:

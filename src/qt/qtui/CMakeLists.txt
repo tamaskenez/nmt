@@ -1,4 +1,4 @@
-file(GLOB sourcese CONFIGURE_DEPENDS e/*.h)
+file(GLOB sourcese CONFIGURE_DEPENDS "#/*.h")
 file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${sourcese} ${sources})
 
