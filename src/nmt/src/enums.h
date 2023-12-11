@@ -9,12 +9,12 @@ struct enum_traits<EntityKind> {
         "enum", "fn", "struct", "class", "header", "memfn"};
 };
 
-enum class Visibility { public_, target };
+enum class Visibility { public_, private_ };
 template<>
 struct enum_traits<Visibility> {
     using enum Visibility;
-    static constexpr std::array<Visibility, 2> elements{public_, target};
-    static constexpr std::array<std::string_view, elements.size()> names{"public", "target"};
+    static constexpr std::array<Visibility, 2> elements{public_, private_};
+    static constexpr std::array<std::string_view, elements.size()> names{"public", "private"};
 };
 
 enum class SpecialCommentKeyword { fdneeds, needs, defneeds, visibility };

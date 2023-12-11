@@ -1,6 +1,6 @@
 #include "NmtApp.h"
 
-#include "sc_UI.h"
+#include "UI.h"
 
 struct NmtAppImpl : NmtApp {
     int run(std::unique_ptr<UI> ui) override {

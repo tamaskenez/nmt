@@ -4,32 +4,35 @@ function(run_nmt target)
 		""
 		"FILES")
 	set(sources_input_file_path "${CMAKE_CURRENT_BINARY_DIR}/generated/sources_input.txt")
-	set(sources_output_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/sources_output")
+	set(output_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/nmt")
 	list(JOIN ARG_FILES "\n" content)
 	file(WRITE ${sources_input_file_path} ${content} "\n")
 	execute_process(COMMAND ${NMT_PROGRAM}
 		--sources ${sources_input_file_path}
-		--output-dir ${sources_output_dir}
+		--output-dir ${output_dir}
 		COMMAND_ECHO STDOUT
 		COMMAND_ERROR_IS_FATAL ANY
 	)
-	file(STRINGS ${sources_output_dir}/files.txt generated_files)
+	file(STRINGS ${output_dir}/files.txt generated_files)
 	set(generated_files_rel "")
 	foreach(f IN LISTS generated_files)
- 		cmake_path(RELATIVE_PATH f BASE_DIRECTORY ${sources_output_dir})
+ 		cmake_path(RELATIVE_PATH f BASE_DIRECTORY ${output_dir})
  		set(generated_files_rel "${generated_files_rel}${f} ")
  	endforeach()
-	message(STATUS "reading file list ${sources_output_dir}/files.txt -> ${generated_files_rel}")
-	source_group(boilerplate FILES ${sources_output_dir}/files.txt ${generated_files})
-	target_sources(${target} PRIVATE ${sources_output_dir}/files.txt ${generated_files})
-	target_include_directories(${target} PUBLIC ${sources_output_dir})
+	message(STATUS "reading file list ${output_dir}/files.txt -> ${generated_files_rel}")
+	source_group(boilerplate FILES ${output_dir}/files.txt ${generated_files})
+	target_sources(${target} PRIVATE ${output_dir}/files.txt ${generated_files})
+	target_include_directories(${target}
+		PUBLIC ${output_dir}/public
+		PRIVATE ${output_dir}/private
+	)
 
 	add_custom_command(TARGET ${target}
 	                   PRE_BUILD
 	                   COMMAND ${NMT_PROGRAM}
 	            	   		--sources ${sources_input_file_path}
-							--output-dir ${sources_output_dir}
-	                   BYPRODUCTS ${sources_output_dir}/files.txt
+							--output-dir ${output_dir}
+	                   BYPRODUCTS ${output_dir}/files.txt
 	                   COMMENT "Running nmt."
 	)
 endfunction()

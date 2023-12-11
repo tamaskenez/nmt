@@ -43,16 +43,6 @@ auto data_plus_size(const T& container) {
     return container.data() + container.size();
 }
 
-// template<class T, class R >
-// void append_range(std::vector<T>&v, R&&rg){
-//	if constexpr (std::is_rvalue_reference_v<R>) {
-//		v.insert(v.end(), std::make_move_iterator(std::ranges::begin(rg)),
-// std::make_move_iterator(std::ranges::end(rg))); 	} else if constexpr
-//(!std::is_rvalue_reference_v<R>){
-//		//v.insert(v.end(), std::ranges::begin(rg), std::ranges::end(rg));
-//	}
-// }
-
 template<class T, class R>
 void append_range(std::vector<T>& v, R&& rg) {
     v.insert(v.end(),

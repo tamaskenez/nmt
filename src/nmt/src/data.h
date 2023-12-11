@@ -2,6 +2,7 @@
 
 #include "enums.h"
 
+#include "constants.h"
 #include "libtokenizer.h"
 
 #ifdef NDEBUG
@@ -98,12 +99,12 @@ inline V Make(EntityKind k) {
 };  // namespace EntityDependentProperties
 
 struct Entity {
-    static constexpr Visibility k_defaultVisibility = Visibility::target;
+    static constexpr Visibility k_defaultVisibility = Visibility::private_;
 
     std::string name;            // Unqualified name.
     std::filesystem::path path;  // Path of the source file. TODO rename to sourcePath.
     std::optional<std::string> namespace_;
-    Visibility visibility = Visibility::target;
+    Visibility visibility = Visibility::private_;
 
     EntityDependentProperties::V dependentProps;
 
@@ -120,6 +121,27 @@ struct Entity {
     std::string MemFnClassName() const {
         CHECK(GetEntityKind() == EntityKind::memfn);
         return path_to_string(path.parent_path().filename());
+    }
+
+    std::filesystem::path VisibilitySubdir() const {
+        switch (visibility) {
+            case Visibility::public_:
+                return k_publicSubdir;
+            case Visibility::private_:
+                return k_privateSubdir;
+        }
+    }
+    std::filesystem::path HeaderSubdir() const {
+        return {};
+    }
+    std::filesystem::path HeaderPath() const {
+        return VisibilitySubdir() / HeaderSubdir() / path_from_string(HeaderFilename());
+    }
+    std::filesystem::path MemberDeclarationsPath() const {
+        return VisibilitySubdir() / HeaderSubdir() / path_from_string(MemberDeclarationsFilename());
+    }
+    std::filesystem::path DefinitionPath() const {
+        return k_privateSubdir / HeaderSubdir() / path_from_string(DefinitionFilename());
     }
 
     void Print() {
