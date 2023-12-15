@@ -1,5 +1,7 @@
 #pragma once
 
+#include "libtokenizer.h"
+
 struct TokenSearchResult {
     std::optional<std::string> error;
 };

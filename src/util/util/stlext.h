@@ -73,3 +73,9 @@ constexpr bool contains(R&& r, const T& value, Proj proj = {}) {
 }
 }  // namespace std::ranges
 #endif
+
+struct path_hash {
+    size_t operator()(const std::filesystem::path& p) const {
+        return std::filesystem::hash_value(p);
+    }
+};

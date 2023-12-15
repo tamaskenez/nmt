@@ -23,6 +23,7 @@ add_subdirectory(thirdparty/dspinellis_tokenizer)
 
 set(WARNINGS_AS_ERRORS 1)
 include(cmake/cpp_warnings.cmake)
+message(STATUS "PROJECT_WARNING_FLAGS: ${PROJECT_WARNING_FLAGS}")
 add_compile_options(${PROJECT_WARNING_FLAGS})
 
 if(BUILD_FULL)

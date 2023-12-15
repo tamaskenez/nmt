@@ -1,5 +1,6 @@
 add_subdirectory(util)
 
+add_subdirectory(nmtlib)
 add_subdirectory(nmt)
 
 if(BUILD_FULL)

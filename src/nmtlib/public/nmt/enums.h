@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/enum_traits.h"
+
 enum class EntityKind { enum_, fn, struct_, class_, header, memfn };
 template<>
 struct enum_traits<EntityKind> {

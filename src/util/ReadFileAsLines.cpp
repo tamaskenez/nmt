@@ -1,6 +1,6 @@
-#include "pch.h"
+#include "util/ReadFileAsLines.h"
 
-#include "ReadFileAsLines.h"
+#include <fstream>
 
 std::optional<std::vector<std::string>> ReadFileAsLines(const std::filesystem::path& p) {
     std::ifstream f(p);

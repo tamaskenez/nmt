@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "TryEatSpecialComment.h"
-#include "enums.h"
+#include "nmt/enums.h"
 #include "parse.h"
 
 std::unordered_set<std::string_view> SpecialCommentKeywords() {
