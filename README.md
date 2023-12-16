@@ -1,28 +1,33 @@
-# NMT - No More Tears with #include boilerplate
+# NMT
 
-MVP in progress of a supposedly easy to use C++ preprocessor + GUI app with the following benefits:
+No More Tears caused by writing #include boilerplate, organizing C++ code into files, slow compile times, spooky C++ error messages at a distance.
+
+This is an MVP-in-progress of a supposedly easy-to-use C++ preprocessor + GUI app with the goal of making C++ development a smoother experience.
+
+The fundamental idea is that when we're constructing C++ programs, architectures, our mental model consists of language-level concepts, like namespaces, classes, functions, type aliases. These language entities should be first-class citizens in a C++ IDE. The IDE should provide an easy way to create and manipulate them. It should be aware about the relations between them.
+
+On the other hand, organizing the language entities into files should be done automatically by the IDE:
+
+- During development it's best to use the highest granularity: each language entity should go into a separate file which minimizes the amount of code that needs to be recompiled after a change. Also, errors can be isolated much better. The IDE can even use heuristics for a dynamically changing precompiled header set.
+- For CI builds it's best to use unity builds which can be reliably constructed automatically if dependency relations between language entities are known and continuously enforced by the IDE.
+
+We're aiming for the following goals and benefits:
 
 - No need to manually manage #include files
-- Smoother, "one-click" developer experience: no need to deal with files (cpp/h), C++ languages entities are created "into the project", no need to make decisions about group and organizing them into source headers
+- Smoother, "one-click" developer experience: no need to deal with files (cpp/h): C++ languages entities are created "into the project", no need to make decisions about grouping and organizing them into source headers
 - No need to duplicate function declarations (cpp + h)
 - Faster builds during development - because we're rebuilding only what has been modified, in the strictest sense: development builds compile each atomic C++ language entity in a separate file
-- Faster builds in CI - because the separate files can automatically be combined into unity builds, since dependency relations between C++ language entities are always known and enforced during development
+- Faster builds in CI using unity builds.
 - More reasonable compiler error messages during development since leaves in the dependency graphs are compiled first, in isolation. Unlike traditional builds where compiling a cpp file might fail because of errors in their headers and the interaction between them.
 - Full compatibility with existing projects: they can be gradually converted or extended with nmt-style modules
 
-The traditional way C++ projects and IDEs work is to store the project in raw C++ files which need to be preprocessed and compiled as "translation units" again and again, to extract information about the program, for example dependencies between language entities (functions, types).
+The best way to achieve these goals would be storing the C++ code in a database of language entities, preferably in an AST.
+This project is a POC experiment, we're trying to achieve many of the benefits of the ideal solution but with minimal effort (no AST, for example). It looks like this:
 
-The alternative would be storing the C++ project as a database of the language entities with dependency relations between entities enforced and maintained throughout the development cycle. That means, for example, that IDE knows about each function, what other entities the function declaration and definition need to compile them.
-
-This project is a POC experiment, trying to achieve many of the benefits of the ideal solution (database of C++ entities stored in AST form with a super-helpful IDE) with minimal effort. It looks like this:
-
-- We store (almost) each C++ language entity in a separate .h file. Each .h file describes (in most cases) exactly one language entity. These files don't contain an `#include` directives and namespace definitions. Instead, the dependencies, namespaces, visibility should be specified in with special keywords in C++ comments, like: `// #needs: <string>, <vector>, "foo.h", SomeClass, BarFactory` and `// #visibility: public` and `// #namespace: foo::bar`
+- We store (almost) each C++ language entity in a separate .h file. These files don't contain `#include` directives or namespace definitions. Instead, the dependencies, namespaces, visibility should be specified with special keywords in C++ comments, like: `// #needs: <string>, <vector>, "foo.h", SomeClass, BarFactory` and `// #visibility: public` and `// #namespace: foo::bar`
 - A GUI app helps creating/managing the language entities and writing the comments describing dependencies, namespaces and visibilty.
-- As a pre-build step added by a simple CMake function the preprocessor creates the boilerplate and cpp files and adds them to the CMake target.
+- In a pre-build step added by a CMake function we invoke a command-line tool which parses the .h files and writes all the boilerplate and cpp files and adds them to the CMake target.
 
 # Targets
 
-- nmtlib: base library for parsing sources and generating boilerplate
-- nmt: command line interface for nmtlib
-
-- 
+<img width="1001" alt="image" src="https://github.com/tamaskenez/nmt/assets/4126943/090a773f-da19-4e81-9dd4-f5bd04167415">
