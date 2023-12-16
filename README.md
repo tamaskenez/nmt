@@ -1,6 +1,6 @@
 # NMT
 
-No More Tears caused by writing #include boilerplate, organizing C++ code into files, slow compile times, spooky C++ error messages at a distance.
+No More Tears caused by writing the #include boilerplate, organizing C++ code into files, slow compile times or spooky C++ error messages at a distance.
 
 This is an MVP-in-progress of a supposedly easy-to-use C++ preprocessor + GUI app with the goal of making C++ development a smoother experience.
 
