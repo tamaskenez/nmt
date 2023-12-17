@@ -29,7 +29,7 @@ The best way to achieve these goals would be storing the C++ code in a database 
 
 - We store (almost) each C++ language entity in a separate .h file. These files don't contain `#include` directives or namespace definitions. Instead, the dependencies, namespaces, visibility should be specified with special annotations in C++ comments, for example:
 
-**<src>/Foo.h:**
+**`<src>/Foo.h`:**
 ```c++
 // #fn
 SomeClass Foo(BarFactory& bf) { ... }
@@ -41,7 +41,7 @@ SomeClass Foo(BarFactory& bf) { ... }
 
 - we will call the `run_nmt` CMake utility function from the corresponding target's CMake script:
 
-**<src>/CMakeLists.txt:**
+**`<src>/CMakeLists.txt`:**
 ```cmake
 add_executable(MyTarget ${sources})
 run_nmt(MyTarget FILES ${sources})
@@ -49,7 +49,7 @@ run_nmt(MyTarget FILES ${sources})
 
 - the `run_nmt` function reads `src/Foo.h`, runs the `nmt` tool to generate the corresponding .h and .cpp files into the build directory and adds the sources to the cmake target. It also adds a pre-build step which keeps the project up to date. The generated files in this case:
 
-**<build>/generated/nmt/public/Foo.h**:
+**`<build>/generated/nmt/public/Foo.h`**:
 
 ```c++
 #pragma once
@@ -57,7 +57,7 @@ run_nmt(MyTarget FILES ${sources})
 class BarFactory;
 ```
 
-**<build>/generated/nmt/private/Foo.cpp**:
+**`<build>/generated/nmt/private/Foo.cpp`**:
 
 ```c++
 #include "<build>/generated/nmt/public/Foo.h"
