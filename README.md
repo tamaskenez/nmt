@@ -28,6 +28,10 @@ This project is a POC experiment, we're trying to achieve many of the benefits o
 - A GUI app helps creating/managing the language entities and writing the comments describing dependencies, namespaces and visibility.
 - In a pre-build step added by a CMake utility function we invoke a command-line tool which parses the .h files and writes all the boilerplate and cpp files and adds them to the CMake target.
 
+# Development plan and status
+
+There's a working command-line tool: `nmt` which parses the source files and creates the boilerplate headers and cpp files. The development of the GUI tool has just started. I will dogfood the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
+
 # Targets
 
 The repository builds a command-line tool: `nmt` and a GUI application `nmtqt`. The other modules are static libraries. The arrows mean *uses*.
