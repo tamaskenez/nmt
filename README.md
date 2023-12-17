@@ -15,7 +15,7 @@ On the other hand, organizing the language entities into files should be done au
 
 ## Objectives
 
-We're aiming for the following goals and benefits:
+I'm aiming for the following goals and benefits:
 
 - No need to manually manage #include files
 - Smoother, "one-click" developer experience: no need to deal with files (cpp/h): C++ languages entities are created "into the project", no need to make decisions about grouping and organizing them into source headers
@@ -25,7 +25,7 @@ We're aiming for the following goals and benefits:
 - More reasonable compiler error messages during development since all language entities are first compiled in isolation before compiling other entities which use them. Unlike in traditional builds where compiling a cpp file might fail because of errors in their headers and the interactions between them.
 - Full compatibility with existing projects: they can be gradually converted or extended with nmt-style modules
 
-The best way to achieve these goals would be storing the C++ code in a database of language entities, preferably in AST. But this project is a POC experiment, we're trying to achieve many of the benefits of the ideal solution but with minimal effort (no AST, for example). It looks like this:
+The best way to achieve these goals would be storing the C++ code in a database of language entities, preferably in AST. But this project is a POC experiment, I'm trying to achieve many of the benefits of the ideal solution but with minimal effort (no AST, for example). It looks like this:
 
 - We store (almost) each C++ language entity in a separate .h file. These files don't contain `#include` directives or namespace definitions. Instead, the dependencies, namespaces, visibility should be specified with special annotations in C++ comments, for example:
 
@@ -55,7 +55,9 @@ run_nmt(MyTarget FILES ${sources})
 #pragma once
 #include "<build>/generated/nmt/public/SomeClass.h"
 class BarFactory;
+namespace foo::bar {
 SomeClass Foo(BarFactory& bf);
+}
 ```
 
 **`<build>/generated/nmt/private/Foo.cpp`**:
@@ -65,16 +67,18 @@ SomeClass Foo(BarFactory& bf);
 #include "<build>/generated/nmt/public/BarFactory.h"
 #include "non-nmt-header.h"
 #include <string>
+namespace foo::bar {
 #include "<src>/Foo.h"
+}
 ```
 
 - A GUI app helps creating and managing the language entities and writing the annotations.
 
 ## Development status
 
-The `nmt` command-line tool is working: it parses the source files and creates the boilerplate headers and cpp files.
+The `nmt` command-line tool is working: it parses the source files and creates the boilerplate headers and cpp files. Namespace support is not implemented yet.
 
-The development of the GUI tool has just started. We're dogfooding the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
+The development of the GUI tool has just started. I'm dogfooding the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
 
 ## Targets
 
