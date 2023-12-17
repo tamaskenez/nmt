@@ -30,4 +30,6 @@ This project is a POC experiment, we're trying to achieve many of the benefits o
 
 # Targets
 
+The repository builds a command-line tool: `nmt` and a GUI application `nmtqt`. Other modules are static libraries.
+
 <img width="1001" alt="image" src="https://github.com/tamaskenez/nmt/assets/4126943/090a773f-da19-4e81-9dd4-f5bd04167415">
