@@ -18,7 +18,7 @@ We're aiming for the following goals and benefits:
 - No need to duplicate function declarations (cpp + h)
 - Faster builds during development - because we're rebuilding only what has been modified, in the strictest sense: development builds compile each atomic C++ language entity in a separate file
 - Faster builds in CI using unity builds.
-- More reasonable compiler error messages during development since leaves in the dependency graphs are compiled first, in isolation. Unlike traditional builds where compiling a cpp file might fail because of errors in their headers and the interaction between them.
+- More reasonable compiler error messages during development since all language entities are first compiled in isolation before compiling other entities which use them. Unlike in traditional builds where compiling a cpp file might fail because of errors in their headers and the interactions between them.
 - Full compatibility with existing projects: they can be gradually converted or extended with nmt-style modules
 
 The best way to achieve these goals would be storing the C++ code in a database of language entities, preferably in an AST.
