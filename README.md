@@ -25,8 +25,8 @@ The best way to achieve these goals would be storing the C++ code in a database 
 This project is a POC experiment, we're trying to achieve many of the benefits of the ideal solution but with minimal effort (no AST, for example). It looks like this:
 
 - We store (almost) each C++ language entity in a separate .h file. These files don't contain `#include` directives or namespace definitions. Instead, the dependencies, namespaces, visibility should be specified with special keywords in C++ comments, like: `// #needs: <string>, <vector>, "foo.h", SomeClass, BarFactory` and `// #visibility: public` and `// #namespace: foo::bar`
-- A GUI app helps creating/managing the language entities and writing the comments describing dependencies, namespaces and visibilty.
-- In a pre-build step added by a CMake function we invoke a command-line tool which parses the .h files and writes all the boilerplate and cpp files and adds them to the CMake target.
+- A GUI app helps creating/managing the language entities and writing the comments describing dependencies, namespaces and visibility.
+- In a pre-build step added by a CMake utility function we invoke a command-line tool which parses the .h files and writes all the boilerplate and cpp files and adds them to the CMake target.
 
 # Targets
 
