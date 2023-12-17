@@ -25,18 +25,27 @@ We're aiming for the following goals and benefits:
 - More reasonable compiler error messages during development since all language entities are first compiled in isolation before compiling other entities which use them. Unlike in traditional builds where compiling a cpp file might fail because of errors in their headers and the interactions between them.
 - Full compatibility with existing projects: they can be gradually converted or extended with nmt-style modules
 
-The best way to achieve these goals would be storing the C++ code in a database of language entities, preferably in an AST.
-This project is a POC experiment, we're trying to achieve many of the benefits of the ideal solution but with minimal effort (no AST, for example). It looks like this:
+The best way to achieve these goals would be storing the C++ code in a database of language entities, preferably in AST. But this project is a POC experiment, we're trying to achieve many of the benefits of the ideal solution but with minimal effort (no AST, for example). It looks like this:
 
-- We store (almost) each C++ language entity in a separate .h file. These files don't contain `#include` directives or namespace definitions. Instead, the dependencies, namespaces, visibility should be specified with special keywords in C++ comments, like: `// #needs: <string>, <vector>, "foo.h", SomeClass, BarFactory` and `// #visibility: public` and `// #namespace: foo::bar`
-- A GUI app helps creating/managing the language entities and writing the comments describing dependencies, namespaces and visibility.
-- In a pre-build step added by a CMake utility function we invoke a command-line tool which parses the .h files and writes all the boilerplate and cpp files and adds them to the CMake target.
+- We store (almost) each C++ language entity in a separate .h file. These files don't contain `#include` directives or namespace definitions. Instead, the dependencies, namespaces, visibility should be specified with special annotations in C++ comments, for example:
+
+```c++
+// #fn
+SomeClass someBar(BarFactory& bf) { ... }
+// #needs: SomeClass, BarFactory
+// #defneeds: <string>, <vector>, "foo.h"
+// #visibility: public
+// #namespace: foo::bar
+```
+
+- A GUI app helps creating/managing the language entities and writing the annotations.
+- In the user project's `CMakeLists.txt`, a pre-build step is added by a CMake utility function which invokes the `nmt` command-line tool which parses the .h files and writes all the boilerplate and cpp files. The generated source files are automatically added to the CMake target.
 
 ## Development status
 
-The repository builds a command-line tool: `nmt` and a GUI application `nmtqt`. 
+This project provides a command-line tool: `nmt` and a GUI application `nmtqt`. 
 
-The `nmt` command-line tool is working: it parses the source files and creates the boilerplate headers and cpp files. The development of the GUI tool has just started. I will dogfood the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
+The `nmt` command-line tool is working: it parses the source files and creates the boilerplate headers and cpp files. The development of the GUI tool has just started. We're dogfooding the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
 
 ## Targets
 
