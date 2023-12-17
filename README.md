@@ -55,6 +55,7 @@ run_nmt(MyTarget FILES ${sources})
 #pragma once
 #include "<build>/generated/nmt/public/SomeClass.h"
 class BarFactory;
+SomeClass Foo(BarFactory& bf);
 ```
 
 **`<build>/generated/nmt/private/Foo.cpp`**:
