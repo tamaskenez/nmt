@@ -4,12 +4,16 @@ No More Tears caused by writing the #include boilerplate, organizing C++ code in
 
 This is an MVP-in-progress of a supposedly easy-to-use C++ preprocessor + GUI app with the goal of making C++ development a smoother experience.
 
+## Why we need this
+
 The fundamental idea is that when we're constructing C++ programs, architectures, our mental model consists of language-level concepts, like namespaces, classes, functions, type aliases. These language entities should be first-class citizens in a C++ IDE. The IDE should provide an easy way to create and manipulate them. It should be aware about the relations between them.
 
 On the other hand, organizing the language entities into files should be done automatically by the IDE:
 
 - During development it's best to use the highest granularity: each language entity should go into a separate file which minimizes the amount of code that needs to be recompiled after a change. Also, errors can be isolated much better. The IDE can even use heuristics for a dynamically changing precompiled header set.
 - For CI builds it's best to use unity builds which can be reliably constructed automatically if dependency relations between language entities are known and continuously enforced by the IDE.
+
+## Objectives
 
 We're aiming for the following goals and benefits:
 
@@ -28,12 +32,14 @@ This project is a POC experiment, we're trying to achieve many of the benefits o
 - A GUI app helps creating/managing the language entities and writing the comments describing dependencies, namespaces and visibility.
 - In a pre-build step added by a CMake utility function we invoke a command-line tool which parses the .h files and writes all the boilerplate and cpp files and adds them to the CMake target.
 
-# Development plan and status
+## Development status
 
-There's a working command-line tool: `nmt` which parses the source files and creates the boilerplate headers and cpp files. The development of the GUI tool has just started. I will dogfood the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
+The repository builds a command-line tool: `nmt` and a GUI application `nmtqt`. 
 
-# Targets
+The `nmt` command-line tool is working: it parses the source files and creates the boilerplate headers and cpp files. The development of the GUI tool has just started. I will dogfood the `nmt` tool by writing most of the GUI app in nmt-style single-language-entity headers.
 
-The repository builds a command-line tool: `nmt` and a GUI application `nmtqt`. The other modules are static libraries. The arrows mean *uses*.
+## Targets
+
+`nmt` and `nmtqt` are executables, the other modules are static libraries. The arrows mean *uses*.
 
 <img width="1001" alt="image" src="https://github.com/tamaskenez/nmt/assets/4126943/090a773f-da19-4e81-9dd4-f5bd04167415">
