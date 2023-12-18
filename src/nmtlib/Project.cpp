@@ -24,3 +24,17 @@ std::expected<std::vector<std::string>, std::string> Project::AddAndProcessSourc
     }
     return std::move(processSourceResult.messages);
 }
+
+std::expected<std::vector<std::string>, std::string> Project::AddAndProcessSources(
+    const std::vector<std::filesystem::path>& sources, bool verbose) {
+    std::vector<std::string> messages;
+    for (auto& sf : sources) {
+        auto ms = AddAndProcessSource(sf, verbose);
+        if (!ms) {
+            return std::unexpected(
+                fmt::format("Failed to process {}, reason: {}\n", sf, ms.error()));
+        }
+        append_range(messages, std::move(*ms));
+    }
+    return messages;
+}

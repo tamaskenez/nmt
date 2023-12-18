@@ -1,72 +1,9 @@
-// #include "pch.h"
-
-// #include "parse.h"
-
 #include "nmt/GenerateBoilerplate.h"
+#include "nmt/ProgramOptions.h"
 #include "nmt/Project.h"
-// #include "ReadFile.h"
-#include "util/ReadFileAsLines.h"
-// #include "TokenSearch.h"
-// #include "WriteFile.h"
-// #include "data.h"
-// #include "fn_ExtractIdentifier.h"
-// #include "sc_Args.h"
+#include "nmt/ResolveSourcesFromCommandLine.h"
 
 namespace fs = std::filesystem;
-
-// Resolve `pathsToDo` argument to list of files.
-std::optional<std::vector<fs::path>> ResolveArgsSources(std::vector<fs::path> pathsToDo,
-                                                        bool verbose) {
-    std::set<fs::path> pathsDone;
-    std::vector<fs::path> sources;
-
-    while (!pathsToDo.empty()) {
-        auto f = std::move(pathsToDo.back());
-        pathsToDo.pop_back();
-        std::error_code ec;
-        auto cf = fs::canonical(f, ec);
-        if (ec) {
-            fmt::print(stderr, "File doesn't exist: `{}`\n", f);
-            return std::nullopt;
-        }
-        if (pathsDone.contains(cf)) {
-            // Duplicate.
-            continue;
-        }
-        pathsDone.insert(cf);
-        auto ext = cf.extension();
-        if (k_validSourceExtensions.contains(ext)) {
-            sources.push_back(cf);
-        } else if (k_fileListExtensions.contains(ext)) {
-            auto pathList = ReadFileAsLines(f);
-            if (!pathList) {
-                fmt::print(stderr, "Can't read file list from `{}`.\n", f);
-                return std::nullopt;
-            }
-            pathsToDo.reserve(pathsToDo.size() + pathList->size());
-            std::optional<fs::path> base;
-            if (f.has_parent_path()) {
-                base = f.parent_path();
-            }
-            for (auto& p : *pathList) {
-                if (!p.empty()) {
-                    if (base) {
-                        p = *base / p;
-                    }
-                    pathsToDo.push_back(std::move(p));
-                }
-            }
-        } else {
-            // Ignore this file.
-            if (verbose) {
-                fmt::print(stderr, "Ignoring file with extension `{}`: {}", ext, f);
-            }
-        }
-    }
-
-    std::sort(sources.begin(), sources.end());
-    return sources;
-}
 
 #if 0
 enum class StructOrClass { struct_, class_ };
@@ -157,12 +94,6 @@ std::expected<std::string, std::string> ExtractStructOrClassDeclaration(
 }
 #endif
 
-struct ProgramOptions {
-    bool verbose = false;
-    std::vector<std::filesystem::path> sources;
-    std::filesystem::path outputDir;
-};
-
 int main(int argc, char* argv[]) {
     absl::InitializeLog();
 
@@ -185,25 +116,33 @@ int main(int argc, char* argv[]) {
 
     CLI11_PARSE(app, argc, argv);
 
-    auto sourcesOr = ResolveArgsSources(args.sources, args.verbose);
+    fmt::print("### NMT ###\n");
+
+    auto sourcesOr = ResolveSourcesFromCommandLine(args.sources, args.verbose);
     if (!sourcesOr) {
+        fmt::print(stderr, "{}\n", sourcesOr.error());
         return EXIT_FAILURE;
     }
     auto sources = std::move(*sourcesOr);
-
-    fmt::print("sources: {}\n", fmt::join(sources, ", "));
-
-    Project project(args.outputDir);
-
-    for (auto& sf : sources) {
-        auto r = project.AddAndProcessSource(sf, args.verbose);
-        if (!r) {
-            fmt::print(stderr, "Failed to process {}: {}\n", sf, r.error());
-            return EXIT_FAILURE;
-        }
+    for (auto& m : sources.messages) {
+        fmt::print("{}\n", m);
     }
 
-    GenerateBoilerplate(project);
+    Project project(args.outputDir);
+    auto msgsOr = project.AddAndProcessSources(sources.resolvedSources, args.verbose);
+    if (!msgsOr) {
+        fmt::print(stderr, "{}\n", msgsOr.error());
+        return EXIT_FAILURE;
+    }
+    for (auto& m : *msgsOr) {
+        fmt::print("{}\n", m);
+    }
+
+    auto gbpr = GenerateBoilerplate(project);
+    if (!gbpr) {
+        fmt::print(stderr, "{}\n", gbpr.error());
+        return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }

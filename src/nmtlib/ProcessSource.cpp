@@ -30,7 +30,7 @@ std::expected<ProcessSourceResult, std::string> ProcessSource(
 
     return ProcessSourceResult{
         .entity = Entity{.name = name,
-                         .path = sourcePath,
+                         .sourcePath = sourcePath,
                          .visibility = ep.visibility.value_or(Entity::k_defaultVisibility),
                          .dependentProps = std::move(ep.dependentProps)},
         .messages = std::move(messages)};

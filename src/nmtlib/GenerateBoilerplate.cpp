@@ -201,7 +201,7 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
             switch (e.GetEntityKind()) {
                 case EntityKind::enum_:
                 case EntityKind::header:
-                    headerContent += fmt::format("#include \"{}\"\n", e.path);
+                    headerContent += fmt::format("#include \"{}\"\n", e.sourcePath);
                     break;
                 case EntityKind::fn:
                     headerContent += fmt::format(
@@ -242,7 +242,7 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                     headerContent += fmt::format("#define {} \"{}\"\n#include \"{}\"\n#undef {}\n",
                                                  k_nmtIncludeMemberDeclarationsMacro,
                                                  project.outputDir / memberDeclarationsPath,
-                                                 e.path,
+                                                 e.sourcePath,
                                                  k_nmtIncludeMemberDeclarationsMacro);
                 } break;
                 case EntityKind::memfn:
@@ -252,7 +252,7 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                     break;
             }
 
-            fmt::print("Processed {} from {}\n", e.name, e.path);
+            fmt::print("Processed {} from {}\n", e.name, e.sourcePath);
             gfw.Write(e.HeaderPath(), headerContent);
         }
         std::string cppContent;
@@ -268,7 +268,7 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                 if (!renderedHeaders.empty()) {
                     cppContent += fmt::format("\n{}", renderedHeaders);
                 }
-                cppContent += fmt::format("\n#include \"{}\"\n", e.path);
+                cppContent += fmt::format("\n#include \"{}\"\n", e.sourcePath);
             },
             [&project, &entities, &cppContent, &e](const EntityDependentProperties::MemFn& dp) {
                 cppContent +=
@@ -285,7 +285,7 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                 for (auto& m : k_memberDefinitionMacros) {
                     cppContent += fmt::format("#define {} {}\n", m.name, m.forCpp);
                 }
-                cppContent += fmt::format("\n#include \"{}\"\n\n", e.path);
+                cppContent += fmt::format("\n#include \"{}\"\n\n", e.sourcePath);
                 for (auto& m : k_memberDefinitionMacros) {
                     cppContent += fmt::format("#undef {}\n", m.name);
                 }

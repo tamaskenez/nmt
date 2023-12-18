@@ -16,4 +16,6 @@ struct Project {
     explicit Project(std::filesystem::path outputDir);
     std::expected<std::vector<std::string>, std::string> AddAndProcessSource(
         const std::filesystem::path& sourcePath, bool verbose);
+    std::expected<std::vector<std::string>, std::string> AddAndProcessSources(
+        const std::vector<std::filesystem::path>& sources, bool verbose);
 };

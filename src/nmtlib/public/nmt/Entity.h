@@ -67,8 +67,8 @@ inline void AssertVariantIndices(EntityKind k) {
 struct Entity {
     static constexpr Visibility k_defaultVisibility = Visibility::private_;
 
-    std::string name;            // Unqualified name.
-    std::filesystem::path path;  // Path of the source file. TODO rename to sourcePath.
+    std::string name;  // Unqualified name.
+    std::filesystem::path sourcePath;
     std::optional<std::string> namespace_;
     Visibility visibility = Visibility::private_;
 
@@ -86,7 +86,7 @@ struct Entity {
     }
     std::string MemFnClassName() const {
         CHECK(GetEntityKind() == EntityKind::memfn);
-        return path_to_string(path.parent_path().filename());
+        return path_to_string(sourcePath.parent_path().filename());
     }
 
     std::filesystem::path VisibilitySubdir() const {
