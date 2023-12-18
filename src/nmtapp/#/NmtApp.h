@@ -1,13 +1,13 @@
-#pragma once
-
-#include <memory>
-
+// #class
 class UI;
-
 class NmtApp {
    public:
-    static std::unique_ptr<NmtApp> make(int argc, char* argv[]);
     virtual ~NmtApp() = default;
 
     virtual int run(std::unique_ptr<UI> ui) = 0;
+
+#include NMT_MEMBER_DECLARATIONS
 };
+
+// #visibility: public
+// #needs: <memory>
