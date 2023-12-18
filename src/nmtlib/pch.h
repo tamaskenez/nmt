@@ -14,6 +14,7 @@
 #include <fmt/format.h>
 #include <fmt/os.h>
 #include <fmt/std.h>
+#include <CLI/CLI.hpp>
 
 #include <algorithm>
 #include <concepts>
@@ -22,6 +23,7 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>

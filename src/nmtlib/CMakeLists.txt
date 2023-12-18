@@ -11,6 +11,7 @@ target_link_libraries(nmtlib
 		absl::log
 		absl::log_initialize
 		libtokenizer::libtokenizer
+		CLI11::CLI11
 	PUBLIC
 		util
 		absl::flat_hash_map

@@ -10,7 +10,6 @@ target_link_libraries(nmt PRIVATE
 	#absl::log_initialize
 	#absl::flat_hash_map
 	#fmt::fmt
-	CLI11::CLI11
 )
 
 target_precompile_headers(nmt PRIVATE pch.h)

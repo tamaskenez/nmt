@@ -97,24 +97,11 @@ std::expected<std::string, std::string> ExtractStructOrClassDeclaration(
 int main(int argc, char* argv[]) {
     absl::InitializeLog();
 
-    CLI::App app("C++ boilerplate generator", "NMT");
-
-    ProgramOptions args;
-
-    app.add_option(
-        "-s,--sources",
-        args.sources,
-        fmt::format("List of source files ({}) or files containing a list of source files ({}, one "
-                    "path on each line) or any other files (they'll be ignored)",
-                    fmt::join(k_validSourceExtensions, ", "),
-                    fmt::join(k_fileListExtensions, ", ")));
-    app.add_option("-o,--output-dir",
-                   args.outputDir,
-                   "Output directory, will be created or content erased/updated, as needed")
-        ->required();
-    app.add_flag("-v,--verbose", args.verbose, "Print more diagnostics");
-
-    CLI11_PARSE(app, argc, argv);
+    auto argsOr = ParseProgramOptions(argc, argv);
+    if (!argsOr) {
+        return argsOr.error();
+    }
+    auto& args = *argsOr;
 
     fmt::print("### NMT ###\n");
 
