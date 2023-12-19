@@ -7,7 +7,7 @@ qt_add_library(qtui ${sourcese} ${sources})
 run_nmt(qtui FILES ${sourcese})
 
 target_link_libraries(qtui PRIVATE
-	common
+	appcommon
 	Qt6::Widgets
 	Qt6::Gui
 )

@@ -5,7 +5,7 @@ add_subdirectory(nmt)
 
 if(BUILD_FULL)
 	add_subdirectory(helloqt)
-	add_subdirectory(common)
-	add_subdirectory(nmtapplogic) # uses common
+	add_subdirectory(appcommon)
+	add_subdirectory(nmtapplogic) # uses appcommon
 	add_subdirectory(qt)
 endif()

@@ -95,7 +95,7 @@ class nmtlib {
 class nmt {
     command line tool of nmtlib
 }
-class common {
+class appcommon {
     common code for the GUI app
 }
 class nmtapplogic {
@@ -109,10 +109,10 @@ class nmtqtapp {
 }
 nmtlib <.. nmt
 util <.. nmtlib
-common <.. nmtapplogic
-common <.. nmtqtapp
+appcommon <.. nmtapplogic
+appcommon <.. nmtqtapp
 qtui <.. nmtqtapp
 nmtapplogic <.. nmtqtapp
-common <.. qtui
+appcommon <.. qtui
 nmtlib <.. nmtapplogic
 ```

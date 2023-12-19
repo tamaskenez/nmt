@@ -26,7 +26,7 @@ set_target_properties(nmtqtapp PROPERTIES
 )
 
 target_link_libraries(nmtqtapp PRIVATE
-    common
+    appcommon
     qtui
     nmtapplogic
 )
