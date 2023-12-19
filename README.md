@@ -82,7 +82,7 @@ The development of the GUI tool has just started. I'm dogfooding the `nmt` tool 
 
 ## Targets
 
-`nmt` and `nmtqt` are executables, the other modules are static libraries. The arrows mean *uses*.
+`nmt` and `nmtqtapp` are executables, the other modules are static libraries. The arrows mean *uses*.
 
 ```mermaid
 classDiagram
@@ -98,21 +98,21 @@ class nmt {
 class common {
     common code for the GUI app
 }
-class nmtapp {
+class nmtapplogic {
     GUI app logic (the Controller)
 }
 class qtui {
     Qt implementation of the UI (the View)
 }
-class nmtqt {
+class nmtqtapp {
     Qt application (inititializes View and Controller)
 }
 nmtlib <.. nmt
 util <.. nmtlib
-common <.. nmtapp
-common <.. nmtqt
-qtui <.. nmtqt
-nmtapp <.. nmtqt
+common <.. nmtapplogic
+common <.. nmtqtapp
+qtui <.. nmtqtapp
+nmtapplogic <.. nmtqtapp
 common <.. qtui
-nmtlib <.. nmtapp
+nmtlib <.. nmtapplogic
 ```
