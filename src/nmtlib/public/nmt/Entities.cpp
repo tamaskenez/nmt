@@ -13,10 +13,10 @@ std::expected<std::monostate, std::string> Entities::addSource(const std::filesy
     const auto id = nextId++;
     auto itb = sourcePathToId.insert(std::make_pair(std::move(canonicalPath), id));
     if (itb.second) {
-        DCHECK(itb.second) << fmt::format("Duplicated source: {}", path);
-    } else {
         const auto& sourcePath = itb.first->first;
         items.insert(std::make_pair(id, Item{sourcePath, ItemState::NewSource{}}));
+    } else {
+        DCHECK(itb.second) << fmt::format("Duplicated source: {}", path);
     }
 
     return {};
@@ -101,7 +101,7 @@ const std::filesystem::path& Entities::sourcePath(Id id) const {
 
 std::vector<Entities::Id> Entities::itemsWithEntities() const {
     std::vector<Id> ids;
-    ids.resize(items.size());
+    ids.reserve(items.size());
     for (auto& [k, v] : items) {
         if (v.state | is<Entity>) {
             ids.push_back(k);

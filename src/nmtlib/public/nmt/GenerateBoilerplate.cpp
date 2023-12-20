@@ -5,113 +5,135 @@
 
 namespace fs = std::filesystem;
 
-std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& project) {
+namespace {
+struct Includes {
+    void addNeedsAsHeaders(const Entities& entities,
+                           const Entity& e,
+                           const std::vector<std::string>& needs,
+                           const fs::path& outputDir) {
+        DCHECK(!failedAndErrorsHasBeenReturned);
+        std::vector<std::string> additionalNeeds;
+        const std::vector<std::string>* currentNeeds = &needs;
+        while (!currentNeeds->empty()) {
+            additionalNeeds = addNeedsAsHeadersCore(entities, e, *currentNeeds, outputDir);
+            // TODO: prevent infinite loop because of some circular dependency.
+            currentNeeds = &additionalNeeds;
+        }
+    }
+    std::expected<std::string, std::vector<std::string>> render() {
+        CHECK(!failedAndErrorsHasBeenReturned);
+        if (!errors.empty()) {
+            failedAndErrorsHasBeenReturned = true;
+            return std::unexpected(std::move(errors));
+        }
+        std::string content;
+        auto addHeaders = [&content](std::vector<std::string>& v) {
+            if (!v.empty()) {
+                if (!content.empty()) {
+                    content += "\n";
+                }
+                std::sort(v.begin(), v.end());
+                for (auto& s : v) {
+                    content += fmt::format("#include {}\n", s);
+                }
+            }
+        };
+        addHeaders(generateds);
+        addHeaders(locals);
+        addHeaders(externalsInDirs);
+        addHeaders(externalWithExtension);
+        addHeaders(externalsWithoutExtension);
+        if (!forwardDeclarations.empty()) {
+            if (!content.empty()) {
+                content += "\n";
+            }
+            std::sort(forwardDeclarations.begin(), forwardDeclarations.end());
+            for (auto& s : forwardDeclarations) {
+                content += fmt::format("{}\n", s);
+            }
+        }
+        return content;
+    }
+
+   private:
+    bool failedAndErrorsHasBeenReturned = false;
+    std::vector<std::string> generateds, locals, externalsInDirs, externalWithExtension,
+        externalsWithoutExtension, forwardDeclarations;
+    std::vector<std::string> errors;
+    void addHeader(std::string_view s) {
+        assert(!s.empty());
+        std::vector<std::string>* v{};
+        if (s[0] == '"') {
+            v = &locals;
+        } else if (s.find('/') != std::string_view::npos) {
+            v = &externalsInDirs;
+        } else if (s.find('.') != std::string_view::npos) {
+            v = &externalWithExtension;
+        } else {
+            v = &externalsWithoutExtension;
+        }
+        v->push_back(std::string(s));
+    };
+    // Return additional needs coming from the enums which have needs for their
+    // opaque-enum-declaration.
+    std::vector<std::string> addNeedsAsHeadersCore(const Entities& entities,
+                                                   const Entity& e,
+                                                   const std::vector<std::string>& needs,
+                                                   const fs::path& outputDir) {
+        std::vector<std::string> additionalNeeds;
+        for (auto& need : needs) {
+            LOG_IF(FATAL, need.empty()) << "Empty need name.";
+            if (need[0] == '<' || need[0] == '"') {
+                addHeader(need);
+            } else {
+                std::string_view needName = need;
+                const bool refOnly = needName.back() == '*';
+                if (refOnly) {
+                    needName.remove_suffix(1);
+                }
+                if (needName == e.name) {
+                    errors.push_back(fmt::format("Entity `{}` can't include itself.", e.name));
+                    continue;
+                }
+                auto maybeId = entities.findByName(needName);
+                if (!maybeId) {
+                    errors.push_back(
+                        fmt::format("Entity `{}` needs `{}` but it's missing.", e.name, needName));
+                    continue;
+                }
+                auto& ne = entities.entity(*maybeId);
+                if (refOnly) {
+                    auto* v = ne.ForwardDeclarationNeedsOrNull();
+                    if (v == nullptr) {
+                        errors.push_back(
+                            fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
+                                        "be forward declared.",
+                                        e.name,
+                                        need,
+                                        enum_name(ne.GetEntityKind())));
+                        continue;
+                    }
+                    additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
+                    forwardDeclarations.push_back(fmt::format("{}", ne.ForwardDeclaration()));
+                } else {
+                    auto path = outputDir / ne.HeaderPath();
+                    generateds.push_back(fmt::format("\"{}\"", path));
+                }
+            }
+        }
+        return additionalNeeds;
+    }
+};
+}  // namespace
+
+std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
+    const Project& project) {
     GeneratedFileWriter gfw(project.outputDir);
+    std::vector<std::string> errors;
 
     // Generate empty header.
     gfw.Write(k_emptyHeaderFilename,
               fmt::format("{}\n{}\n", k_autogeneratedWarningLine, k_IntentionallyEmptyLineWarning));
-
-    struct Includes {
-        std::vector<std::string> generateds, locals, externalsInDirs, externalWithExtension,
-            externalsWithoutExtension, forwardDeclarations;
-        void addHeader(std::string_view s) {
-            assert(!s.empty());
-            std::vector<std::string>* v{};
-            if (s[0] == '"') {
-                v = &locals;
-            } else if (s.find('/') != std::string_view::npos) {
-                v = &externalsInDirs;
-            } else if (s.find('.') != std::string_view::npos) {
-                v = &externalWithExtension;
-            } else {
-                v = &externalsWithoutExtension;
-            }
-            v->push_back(std::string(s));
-        };
-        std::string render() {
-            std::string content;
-            auto addHeaders = [&content](std::vector<std::string>& v) {
-                if (!v.empty()) {
-                    if (!content.empty()) {
-                        content += "\n";
-                    }
-                    std::sort(v.begin(), v.end());
-                    for (auto& s : v) {
-                        content += fmt::format("#include {}\n", s);
-                    }
-                }
-            };
-            addHeaders(generateds);
-            addHeaders(locals);
-            addHeaders(externalsInDirs);
-            addHeaders(externalWithExtension);
-            addHeaders(externalsWithoutExtension);
-            if (!forwardDeclarations.empty()) {
-                if (!content.empty()) {
-                    content += "\n";
-                }
-                std::sort(forwardDeclarations.begin(), forwardDeclarations.end());
-                for (auto& s : forwardDeclarations) {
-                    content += fmt::format("{}\n", s);
-                }
-            }
-            return content;
-        }
-        void addNeedsAsHeaders(const Entities& entities,
-                               const Entity& e,
-                               const std::vector<std::string>& needs,
-                               const fs::path& outputDir) {
-            std::vector<std::string> additionalNeeds;
-            const std::vector<std::string>* currentNeeds = &needs;
-            while (!currentNeeds->empty()) {
-                additionalNeeds = addNeedsAsHeadersCore(entities, e, *currentNeeds, outputDir);
-                // TODO: prevent infinite loop because of some circular dependency.
-                currentNeeds = &additionalNeeds;
-            }
-        }
-        // Return additional needs coming from the enums which have needs for their
-        // opaque-enum-declaration.
-        std::vector<std::string> addNeedsAsHeadersCore(const Entities& entities,
-                                                       const Entity& e,
-                                                       const std::vector<std::string>& needs,
-                                                       const fs::path& outputDir) {
-            std::vector<std::string> additionalNeeds;
-            for (auto& need : needs) {
-                LOG_IF(FATAL, need.empty()) << "Empty need name.";
-                if (need[0] == '<' || need[0] == '"') {
-                    addHeader(need);
-                } else {
-                    std::string_view needName = need;
-                    const bool refOnly = needName.back() == '*';
-                    if (refOnly) {
-                        needName.remove_suffix(1);
-                    }
-                    LOG_IF(FATAL, needName == e.name)
-                        << fmt::format("Entity `{}` can't include itself.", e.name);
-                    auto maybeId = entities.findByName(needName);
-                    LOG_IF(FATAL, !maybeId) << fmt::format(
-                        "Entity `{}` needs `{}` but it's missing.", e.name, needName);
-                    auto& ne = entities.entity(*maybeId);
-                    if (refOnly) {
-                        auto* v = ne.ForwardDeclarationNeedsOrNull();
-                        LOG_IF(FATAL, v == nullptr)
-                            << fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
-                                           "be forward declared.",
-                                           e.name,
-                                           need,
-                                           enum_name(ne.GetEntityKind()));
-                        additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
-                        forwardDeclarations.push_back(fmt::format("{}", ne.ForwardDeclaration()));
-                    } else {
-                        auto path = outputDir / ne.HeaderPath();
-                        generateds.push_back(fmt::format("\"{}\"", path));
-                    }
-                }
-            }
-            return additionalNeeds;
-        }
-    };
 
     auto entityIds = project.entities.itemsWithEntities();
 
@@ -192,7 +214,12 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                         // memfn's declaration needs go to the class/struct header.
                         break;
                 }
-                auto renderedHeaders = includes.render();
+                auto renderedHeadersOr = includes.render();
+                if (!renderedHeadersOr) {
+                    append_range(errors, std::move(renderedHeadersOr.error()));
+                    continue;
+                }
+                auto& renderedHeaders = *renderedHeadersOr;
                 if (!renderedHeaders.empty()) {
                     headerContent += fmt::format("\n{}", renderedHeaders);
                 }
@@ -256,22 +283,28 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
             gfw.Write(e.HeaderPath(), headerContent);
         }
         std::string cppContent;
+        bool cppContentProductionFailed = false;
         switch_variant(
             e.dependentProps,
-            [&project, &cppContent, &e](const EntityDependentProperties::Fn& dp) {
+            [&](const EntityDependentProperties::Fn& dp) {
                 cppContent += fmt::format("{}\n#include \"{}\"\n",
                                           k_autogeneratedWarningLine,
                                           project.outputDir / e.HeaderPath());
                 Includes includes;
                 includes.addNeedsAsHeaders(
                     project.entities, e, dp.definitionNeeds, project.outputDir);
-                auto renderedHeaders = includes.render();
+                auto renderedHeadersOr = includes.render();
+                if (!renderedHeadersOr) {
+                    append_range(errors, std::move(renderedHeadersOr.error()));
+                    return;
+                }
+                auto& renderedHeaders = *renderedHeadersOr;
                 if (!renderedHeaders.empty()) {
                     cppContent += fmt::format("\n{}", renderedHeaders);
                 }
                 cppContent += fmt::format("\n#include \"{}\"\n", e.sourcePath);
             },
-            [&project, &cppContent, &e](const EntityDependentProperties::MemFn& dp) {
+            [&](const EntityDependentProperties::MemFn& dp) {
                 auto maybeMfid = project.entities.findByName(e.MemFnClassName());
                 CHECK(maybeMfid) << fmt::format("Containing class entity with name `{}` not found",
                                                 e.MemFnClassName());
@@ -282,7 +315,12 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                 Includes includes;
                 includes.addNeedsAsHeaders(
                     project.entities, e, dp.definitionNeeds, project.outputDir);
-                auto renderedHeaders = includes.render();
+                auto renderedHeadersOr = includes.render();
+                if (!renderedHeadersOr) {
+                    append_range(errors, std::move(renderedHeadersOr.error()));
+                    return;
+                }
+                auto& renderedHeaders = *renderedHeadersOr;
                 if (!renderedHeaders.empty()) {
                     cppContent += fmt::format("\n{}", renderedHeaders);
                 }
@@ -295,11 +333,14 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
                     cppContent += fmt::format("#undef {}\n", m.name);
                 }
             },
-            [&project, &cppContent, headerPath = e.HeaderPath()](const auto&) {
+            [&](const auto&) {
                 cppContent += fmt::format("{}\n#include \"{}\"\n",
                                           k_autogeneratedWarningLine,
-                                          project.outputDir / headerPath);
+                                          project.outputDir / e.HeaderPath());
             });
+        if (cppContentProductionFailed) {
+            continue;
+        }
         gfw.Write(e.DefinitionPath(), cppContent);
     }  // for a: entities
     std::ranges::sort(gfw.currentFiles);
@@ -309,5 +350,9 @@ std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& pr
     }
     gfw.Write(k_fileListFilename, fileListContent);
     gfw.RemoveRemainingExistingFilesAndDirs();
-    return {};
+    if (errors.empty()) {
+        return {};
+    } else {
+        return std::unexpected(std::move(errors));
+    }
 }

@@ -6,4 +6,4 @@
 
 struct Project;
 
-std::expected<std::monostate, std::string> GenerateBoilerplate(const Project& project);
+std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(const Project& project);

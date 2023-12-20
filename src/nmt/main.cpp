@@ -159,7 +159,9 @@ int main(int argc, char* argv[]) {
 
     auto gbpr = GenerateBoilerplate(project);
     if (!gbpr) {
-        fmt::print(stderr, "{}\n", gbpr.error());
+        for (auto& e : gbpr.error()) {
+            fmt::print(stderr, "Error: {}\n", e);
+        }
         return EXIT_FAILURE;
     }
 

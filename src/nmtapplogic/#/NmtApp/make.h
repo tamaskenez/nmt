@@ -21,5 +21,5 @@ STATIC std::expected<std::unique_ptr<NmtApp>, std::string> NmtApp::make(int argc
     return std::make_unique<NmtAppImpl>(std::move(project));
 }
 // #needs: <memory>, <expected>
-// #defneeds: NmtAppImpl, "nmt/ProgramOptions.h",
+// #defneeds: NmtAppImpl, "nmt/ProgramOptions.h"
 // "util/error.h","nmt/Project.h","nmt/ResolveSourcesFromCommandLine.h" #visibility: public
