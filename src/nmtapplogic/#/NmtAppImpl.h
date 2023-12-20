@@ -1,5 +1,7 @@
 // #struct
 struct NmtAppImpl : NmtApp {
+    NmtAppImpl() = default;
+    std::unique_ptr<UserState> userState;
 #include NMT_MEMBER_DECLARATIONS
 };
-// #needs: NmtApp
+// #needs: NmtApp, "appcommon/UserState.h", <memory>

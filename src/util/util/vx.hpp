@@ -119,8 +119,9 @@ constexpr bool operator|(std::variant<Ts...> const& variant, compare<Type>) {
 
 // =====[ any|is ]=====
 //! constexpr just for being futureproof :)
-template<typename Type>
-constexpr bool operator|(std::any const& a, compare<Type>) {
+template<typename Any, typename Type>
+requires std::is_same_v<Any, std::any>
+constexpr bool operator|(Any const& a, compare<Type>) {
     return a.type() == typeid(Type);
 }
 

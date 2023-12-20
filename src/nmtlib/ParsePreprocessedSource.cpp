@@ -107,7 +107,9 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
 }  // namespace
 
 std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSource(
-    std::string_view name, const PreprocessedSource& pps, std::string_view parentDirName) {
+    std::string_view name,
+    const PreprocessedSource& pps,
+    std::optional<std::string_view> parentDirName) {
     struct Collector {
         std::optional<Visibility> visibility;
         std::optional<EntityKind> entityKind;

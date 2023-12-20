@@ -28,4 +28,5 @@ struct MemberDefinitionMacro {
 inline const std::vector<MemberDefinitionMacro> k_memberDefinitionMacros = {
     MemberDefinitionMacro{"OVERRIDE", "override", ""},
     MemberDefinitionMacro{"VIRTUAL", "virtual", ""},
+    MemberDefinitionMacro{"EXPLICIT", "explicit", ""},
     MemberDefinitionMacro{"STATIC", "static", ""}};

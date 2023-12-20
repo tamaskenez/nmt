@@ -5,4 +5,4 @@ class UI {
 
     virtual int exec() = 0;
 };
-// #visibility:public
+// #visibility: public

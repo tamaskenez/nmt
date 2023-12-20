@@ -1,7 +1,7 @@
 #pragma once
 
+#include "nmt/Entities.h"
 #include "nmt/Entity.h"
-#include "nmt/base_types.h"
 
 #include <expected>
 #include <filesystem>
@@ -11,11 +11,7 @@
 
 struct Project {
     std::filesystem::path outputDir;
-    flat_hash_map<std::string, Entity> entities;
+    Entities entities;
 
     explicit Project(std::filesystem::path outputDir);
-    std::expected<std::vector<std::string>, std::string> AddAndProcessSource(
-        const std::filesystem::path& sourcePath, bool verbose);
-    std::expected<std::vector<std::string>, std::string> AddAndProcessSources(
-        const std::vector<std::filesystem::path>& sources, bool verbose);
 };

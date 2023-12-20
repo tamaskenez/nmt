@@ -1,4 +1,5 @@
 #include "nmt/GenerateBoilerplate.h"
+#include "nmt/ProcessSource.h"
 #include "nmt/ProgramOptions.h"
 #include "nmt/Project.h"
 #include "nmt/ResolveSourcesFromCommandLine.h"
@@ -116,13 +117,44 @@ int main(int argc, char* argv[]) {
     }
 
     Project project(args.outputDir);
-    auto msgsOr = project.AddAndProcessSources(sources.resolvedSources, args.verbose);
-    if (!msgsOr) {
-        fmt::print(stderr, "{}\n", msgsOr.error());
-        return EXIT_FAILURE;
+    for (auto& s : sources.resolvedSources) {
+        project.entities.addSource(s);
     }
-    for (auto& m : *msgsOr) {
-        fmt::print("{}\n", m);
+    std::vector<std::string> verboseMessages, errors;
+    for (auto id : project.entities.dirtySources()) {
+        auto& sourcePath = project.entities.sourcePath(id);
+        switch_variant(
+            ProcessSource(sourcePath),
+            [&](Entity&& x) {
+                project.entities.updateSourceWithEntity(id, std::move(x));
+            },
+            [&](ProcessSourceResult::SourceWithoutSpecialComments&& x) {
+                project.entities.updateSourceNoSpecialComments(id, x.lastWriteTime);
+                if (args.verbose) {
+                    verboseMessages.push_back(
+                        fmt::format("Ignoring file without NMT annotations: {}", sourcePath));
+                }
+            },
+            [&](ProcessSourceResult::CantReadFile) {
+                project.entities.updateSourceCantReadFile(id);
+                errors.push_back(fmt::format("Can't read file: {}", sourcePath));
+            },
+            [&](ProcessSourceResult::Error&& x) {
+                project.entities.updateSourceError(id, x.message, x.lastWriteTime);
+                errors.push_back(
+                    fmt::format("Failed to process file {}, reason: {}", sourcePath, x.message));
+            });
+    }
+    if (args.verbose) {
+        for (auto& m : verboseMessages) {
+            fmt::print("Note: {}\n", m);
+        }
+    }
+    for (auto& m : errors) {
+        fmt::print("ERROR: {}\n", m);
+    }
+    if (!errors.empty()) {
+        return EXIT_FAILURE;
     }
 
     auto gbpr = GenerateBoilerplate(project);

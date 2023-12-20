@@ -69,6 +69,7 @@ struct Entity {
 
     std::string name;  // Unqualified name.
     std::filesystem::path sourcePath;
+    std::filesystem::file_time_type lastWriteTime;
     std::optional<std::string> namespace_;
     Visibility visibility = Visibility::private_;
 
@@ -85,7 +86,7 @@ struct Entity {
         return fmt::format("{}.cpp", name);
     }
     std::string MemFnClassName() const {
-        CHECK(GetEntityKind() == EntityKind::memfn);
+        CHECK(GetEntityKind() == EntityKind::memfn && sourcePath.has_parent_path());
         return path_to_string(sourcePath.parent_path().filename());
     }
 

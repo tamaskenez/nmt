@@ -156,6 +156,25 @@ inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
     }                                                                                             \
     auto&& VAR = std::move(*TMP_VAR)
 
+namespace detail {
+template<class T>
+struct ErrorOrNullopt;
+
+template<class T>
+struct ErrorOrNullopt<std::optional<T>> {
+    std::nullopt_t operator()(const std::optional<T>&) const {
+        return std::nullopt;
+    }
+};
+
+template<class T, class E>
+struct ErrorOrNullopt<std::expected<T, E>> {
+    E& operator()(std::expected<T, E>& e) const {
+        return e.error();
+    }
+};
+}  // namespace detail
+
 // Assign if no error, return unexpected otherwise:
 //
 //     TRY_ASSIGN_OR_UNEXPECTED(<var>, <std::expected-rvalue, args, ...):
@@ -178,6 +197,51 @@ inline constexpr bool is_std_expected_v = is_std_expected<T>::value;
                                        UTIL_PP_CONCAT(_tmp_var_, __COUNTER__),      \
                                        UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__), \
                                        __VA_ARGS__)
+
+// __VA_ARGS__ are the arguments for std::unexpected()
+#define _TRY_ASSIGN_OR_RETURN_VALUE_INTERNAL(                                          \
+    VAR, EXPECTED_OR_OPTIONAL, TMP_VAR, TMP_VAR_TYPE, VALUE)                           \
+    auto&& TMP_VAR = (EXPECTED_OR_OPTIONAL);                                           \
+    static_assert(std::is_rvalue_reference_v<decltype(TMP_VAR)>);                      \
+    using TMP_VAR_TYPE = std::decay_t<decltype(TMP_VAR)>;                              \
+    /* assert that it's std::expected<T, E> or std::optional<T> */                     \
+    static_assert(is_std_expected_v<TMP_VAR_TYPE> || is_std_optional_v<TMP_VAR_TYPE>); \
+    if (!TMP_VAR.has_value()) {                                                        \
+        [[maybe_unused]] auto&& UNEXPECTED_ERROR =                                     \
+            detail::ErrorOrNullopt<TMP_VAR_TYPE>()(TMP_VAR);                           \
+        return VALUE;                                                                  \
+    }                                                                                  \
+    auto&& VAR = std::move(*TMP_VAR)
+
+// Assign if no error, return unexpected otherwise:
+//
+//     TRY_ASSIGN_OR_RETURN_VALUE(<var>, <std::expected-rvalue, args, value):
+//     TRY_ASSIGN_OR_RETURN_VALUE(<var>, <std::optional-rvalue, args, value):
+//
+// The `value` can be a complex expression and it can use the variable UNEXPECTED_ERROR which is a
+// reference to the `std::expected<T,E>::error()` or std::nullopt.
+//
+// Example usage:
+//
+//     TRY_ASSIGN(var, foo(), "failed");
+//     TRY_ASSIGN(var, foo(), UNEXPECTED_ERROR == 3 ? "OK" : "NOTOK");
+//
+// Equivalent to
+//
+// auto tmp = foo();
+// if (!tmp) {
+//     auto& UNEXPECTED_ERROR = tmp.error();
+//     return value;
+// }
+// auto&& var = std::move(*tmp);
+//
+// __VA_ARGS__ are the arguments for std::unexpected()
+#define TRY_ASSIGN_OR_RETURN_VALUE(VAR, EXPECTED_OR_OPTIONAL, VALUE)                  \
+    _TRY_ASSIGN_OR_RETURN_VALUE_INTERNAL(VAR,                                         \
+                                         EXPECTED_OR_OPTIONAL,                        \
+                                         UTIL_PP_CONCAT(_tmp_var_, __COUNTER__),      \
+                                         UTIL_PP_CONCAT(_tmp_var_type_, __COUNTER__), \
+                                         VALUE)
 
 #ifndef _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL
 #    define _UTIL_ERROR_ENABLE_IF_TESTING_INTERNAL(VAR)

@@ -17,7 +17,8 @@ std::expected<ResolveSourcesFromCommandLineResult, std::string> ResolveSourcesFr
         std::error_code ec;
         auto cf = fs::canonical(f, ec);
         if (ec) {
-            return std::unexpected(fmt::format("File doesn't exist: `{}`", f));
+            return std::unexpected(
+                fmt::format("Error processing source file `{}`: {}", f, ec.message()));
         }
         if (pathsDone.contains(cf)) {
             // Duplicate.

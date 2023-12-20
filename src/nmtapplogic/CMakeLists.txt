@@ -6,6 +6,7 @@ run_nmt(nmtapplogic FILES ${sourcese})
 
 target_link_libraries(nmtapplogic PRIVATE
 	appcommon
+	nmtlib
 )
 
 target_include_directories(nmtapplogic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
