@@ -29,6 +29,7 @@ target_link_libraries(nmtqtapp PRIVATE
     appcommon
     qtui
     nmtapplogic
+    fmt::fmt
 )
 
 

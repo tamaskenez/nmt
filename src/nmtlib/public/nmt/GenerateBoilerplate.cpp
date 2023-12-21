@@ -6,16 +6,20 @@
 namespace fs = std::filesystem;
 
 namespace {
-struct Includes {
+struct IncludeSectionBuilder {
+    IncludeSectionBuilder(
+        fs::path outputDir,
+        std::function<const fs::path&(const fs::path&)> sourcePathToTargetSubdirFn)
+        : outputDir(std::move(outputDir))
+        , sourcePathToTargetSubdirFn(std::move(sourcePathToTargetSubdirFn)) {}
     void addNeedsAsHeaders(const Entities& entities,
                            const Entity& e,
-                           const std::vector<std::string>& needs,
-                           const fs::path& outputDir) {
+                           const std::vector<std::string>& needs) {
         DCHECK(!failedAndErrorsHasBeenReturned);
         std::vector<std::string> additionalNeeds;
         const std::vector<std::string>* currentNeeds = &needs;
         while (!currentNeeds->empty()) {
-            additionalNeeds = addNeedsAsHeadersCore(entities, e, *currentNeeds, outputDir);
+            additionalNeeds = addNeedsAsHeadersCore(entities, e, *currentNeeds);
             // TODO: prevent infinite loop because of some circular dependency.
             currentNeeds = &additionalNeeds;
         }
@@ -32,7 +36,7 @@ struct Includes {
                 if (!content.empty()) {
                     content += "\n";
                 }
-                std::sort(v.begin(), v.end());
+                sort_unique_inplace(v);
                 for (auto& s : v) {
                     content += fmt::format("#include {}\n", s);
                 }
@@ -47,7 +51,7 @@ struct Includes {
             if (!content.empty()) {
                 content += "\n";
             }
-            std::sort(forwardDeclarations.begin(), forwardDeclarations.end());
+            sort_unique_inplace(forwardDeclarations);
             for (auto& s : forwardDeclarations) {
                 content += fmt::format("{}\n", s);
             }
@@ -56,6 +60,8 @@ struct Includes {
     }
 
    private:
+    fs::path outputDir;
+    std::function<const fs::path&(const fs::path&)> sourcePathToTargetSubdirFn;
     bool failedAndErrorsHasBeenReturned = false;
     std::vector<std::string> generateds, locals, externalsInDirs, externalWithExtension,
         externalsWithoutExtension, forwardDeclarations;
@@ -78,8 +84,7 @@ struct Includes {
     // opaque-enum-declaration.
     std::vector<std::string> addNeedsAsHeadersCore(const Entities& entities,
                                                    const Entity& e,
-                                                   const std::vector<std::string>& needs,
-                                                   const fs::path& outputDir) {
+                                                   const std::vector<std::string>& needs) {
         std::vector<std::string> additionalNeeds;
         for (auto& need : needs) {
             LOG_IF(FATAL, need.empty()) << "Empty need name.";
@@ -95,7 +100,7 @@ struct Includes {
                     errors.push_back(fmt::format("Entity `{}` can't include itself.", e.name));
                     continue;
                 }
-                auto maybeId = entities.findByName(needName);
+                auto maybeId = entities.findNonMemberByName(needName);
                 if (!maybeId) {
                     errors.push_back(
                         fmt::format("Entity `{}` needs `{}` but it's missing.", e.name, needName));
@@ -116,7 +121,8 @@ struct Includes {
                     additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
                     forwardDeclarations.push_back(fmt::format("{}", ne.ForwardDeclaration()));
                 } else {
-                    auto path = outputDir / ne.HeaderPath();
+                    auto path =
+                        outputDir / ne.HeaderPath(sourcePathToTargetSubdirFn(ne.sourcePath));
                     generateds.push_back(fmt::format("\"{}\"", path));
                 }
             }
@@ -124,6 +130,42 @@ struct Includes {
         return additionalNeeds;
     }
 };
+struct TargetSubdirOfSourcePath {
+    std::vector<std::pair<fs::path, fs::path>> parentDirToSubdir;
+    template<class PathToDirConfigFileMap>
+    explicit TargetSubdirOfSourcePath(const PathToDirConfigFileMap& dirConfigFiles) {
+        parentDirToSubdir.reserve(dirConfigFiles.size());
+        for (auto& [k, v] : dirConfigFiles) {
+            if (v.subdir) {
+                parentDirToSubdir.push_back(std::make_pair(v.parentDir, *v.subdir));
+            }
+        }
+        std::ranges::sort(parentDirToSubdir);
+        for (size_t i = 0; i < parentDirToSubdir.size(); ++i) {
+            DCHECK(parentDirToSubdir[i - 1].first != parentDirToSubdir[i].first) << fmt::format(
+                "Duplicated parent paths for dir config files: {}", parentDirToSubdir[i - 1].first);
+        }
+    }
+    const fs::path& subdir(const fs::path& sourcePath) const {
+        static const fs::path k_emptyPath;
+        if (parentDirToSubdir.empty() || !sourcePath.has_parent_path()) {
+            return k_emptyPath;
+        }
+        auto parentPath = sourcePath.parent_path();
+        auto it = std::ranges::upper_bound(
+            parentDirToSubdir, parentPath, {}, [](auto&& x) -> const fs::path& {
+                return x.first;
+            });
+        if (it == std::ranges::begin(parentDirToSubdir)) {
+            return k_emptyPath;
+        }
+        --it;  // There is always a previous item because parentDirToSubdir is not empty.
+        auto mr = std::ranges::mismatch(it->first, parentPath);
+        bool dirConfigFileParentIsPrefixOfSourcePath = mr.in1 == it->first.end();
+        return dirConfigFileParentIsPrefixOfSourcePath ? it->second : k_emptyPath;
+    }
+};
+
 }  // namespace
 
 std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
@@ -137,25 +179,55 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
 
     auto entityIds = project.entities.itemsWithEntities();
 
+    TargetSubdirOfSourcePath targetSubdirOfSourcePath(project.dirConfigFiles);
+    auto targetSubdirOfSourcePathFn = [&targetSubdirOfSourcePath](const fs::path& x) {
+        return targetSubdirOfSourcePath.subdir(x);
+    };
+
     flat_hash_map<std::string, std::vector<Entities::Id>> membersOfClasses;
+    flat_hash_map<fs::path, fs::path, path_hash> generatedHeaderPathToSourcePath;
     for (auto id : entityIds) {
         auto& e = project.entities.entity(id);
         if (e.GetEntityKind() == EntityKind::memfn) {
             membersOfClasses[e.MemFnClassName()].push_back(id);
+        } else {
+            auto itb = generatedHeaderPathToSourcePath.insert(std::make_pair(
+                e.HeaderPath(targetSubdirOfSourcePathFn(e.sourcePath)), e.sourcePath));
+            if (!itb.second) {
+                errors.push_back(
+                    fmt::format("Two source files have the same generated header path. File#1: "
+                                "`{}`, File#2: `{}`, generated path: `{}`",
+                                itb.first->second,
+                                e.sourcePath,
+                                itb.first->first));
+            }
         }
     }
 
     for (auto id : entityIds) {
         auto& e = project.entities.entity(id);
-        if (e.GetEntityKind() != EntityKind::memfn) {
+        bool generateHeader;
+        switch (e.GetEntityKind()) {
+            case EntityKind::enum_:
+            case EntityKind::fn:
+            case EntityKind::struct_:
+            case EntityKind::class_:
+            case EntityKind::header:
+                generateHeader = true;
+                break;
+            case EntityKind::memfn:
+                generateHeader = false;
+                break;
+        }
+        if (generateHeader) {
             std::string headerContent =
                 fmt::format("{}\n#pragma once\n", k_autogeneratedWarningLine);
             {
-                Includes includes;
-                auto addNeedsAsHeaders = [&includes, &outputDir = project.outputDir, &e, &project](
-                                             const std::vector<std::string>& needs) {
-                    includes.addNeedsAsHeaders(project.entities, e, needs, outputDir);
-                };
+                IncludeSectionBuilder includes(project.outputDir, targetSubdirOfSourcePathFn);
+                auto addNeedsAsHeaders =
+                    [&includes, &e, &project](const std::vector<std::string>& needs) {
+                        includes.addNeedsAsHeaders(project.entities, e, needs);
+                    };
                 switch (e.GetEntityKind()) {
                     case EntityKind::enum_:
                         addNeedsAsHeaders(
@@ -248,7 +320,8 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                     if (it == membersOfClasses.end()) {
                         memberDeclarationsPath = path_from_string(k_emptyHeaderFilename);
                     } else {
-                        memberDeclarationsPath = e.MemberDeclarationsPath();
+                        memberDeclarationsPath =
+                            e.MemberDeclarationsPath(targetSubdirOfSourcePathFn(e.sourcePath));
                         std::string mdContent = fmt::format("{}\n\n", k_autogeneratedWarningLine);
                         for (auto& m : k_memberDefinitionMacros) {
                             mdContent += fmt::format("#define {} {}\n", m.name, m.forHeader);
@@ -280,19 +353,20 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
             }
 
             fmt::print("Processed {} from {}\n", e.name, e.sourcePath);
-            gfw.Write(e.HeaderPath(), headerContent);
+            gfw.Write(e.HeaderPath(targetSubdirOfSourcePathFn(e.sourcePath)), headerContent);
         }
         std::string cppContent;
         bool cppContentProductionFailed = false;
         switch_variant(
             e.dependentProps,
             [&](const EntityDependentProperties::Fn& dp) {
-                cppContent += fmt::format("{}\n#include \"{}\"\n",
-                                          k_autogeneratedWarningLine,
-                                          project.outputDir / e.HeaderPath());
-                Includes includes;
-                includes.addNeedsAsHeaders(
-                    project.entities, e, dp.definitionNeeds, project.outputDir);
+                cppContent += fmt::format(
+                    "{}\n#include \"{}\"\n",
+                    k_autogeneratedWarningLine,
+                    project.outputDir / e.HeaderPath(targetSubdirOfSourcePathFn(e.sourcePath)));
+                IncludeSectionBuilder includes(project.outputDir, targetSubdirOfSourcePathFn);
+
+                includes.addNeedsAsHeaders(project.entities, e, dp.definitionNeeds);
                 auto renderedHeadersOr = includes.render();
                 if (!renderedHeadersOr) {
                     append_range(errors, std::move(renderedHeadersOr.error()));
@@ -305,16 +379,16 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                 cppContent += fmt::format("\n#include \"{}\"\n", e.sourcePath);
             },
             [&](const EntityDependentProperties::MemFn& dp) {
-                auto maybeMfid = project.entities.findByName(e.MemFnClassName());
+                auto maybeMfid = project.entities.findNonMemberByName(e.MemFnClassName());
                 CHECK(maybeMfid) << fmt::format("Containing class entity with name `{}` not found",
                                                 e.MemFnClassName());
+                auto& mfe = project.entities.entity(*maybeMfid);
                 cppContent += fmt::format(
                     "{}\n#include \"{}\"\n",
                     k_autogeneratedWarningLine,
-                    project.outputDir / project.entities.entity(*maybeMfid).HeaderPath());
-                Includes includes;
-                includes.addNeedsAsHeaders(
-                    project.entities, e, dp.definitionNeeds, project.outputDir);
+                    project.outputDir / mfe.HeaderPath(targetSubdirOfSourcePathFn(mfe.sourcePath)));
+                IncludeSectionBuilder includes(project.outputDir, targetSubdirOfSourcePathFn);
+                includes.addNeedsAsHeaders(project.entities, e, dp.definitionNeeds);
                 auto renderedHeadersOr = includes.render();
                 if (!renderedHeadersOr) {
                     append_range(errors, std::move(renderedHeadersOr.error()));
@@ -334,9 +408,10 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                 }
             },
             [&](const auto&) {
-                cppContent += fmt::format("{}\n#include \"{}\"\n",
-                                          k_autogeneratedWarningLine,
-                                          project.outputDir / e.HeaderPath());
+                cppContent += fmt::format(
+                    "{}\n#include \"{}\"\n",
+                    k_autogeneratedWarningLine,
+                    project.outputDir / e.HeaderPath(targetSubdirOfSourcePathFn(e.sourcePath)));
             });
         if (cppContentProductionFailed) {
             continue;

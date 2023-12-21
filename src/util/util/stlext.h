@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <filesystem>
 #include <iterator>
@@ -79,3 +80,16 @@ struct path_hash {
         return std::filesystem::hash_value(p);
     }
 };
+
+template<class T>
+void sort_unique_inplace(std::vector<T>& xs) {
+    std::ranges::sort(xs);
+    xs.erase(std::unique(xs.begin(), xs.end()), xs.end());
+}
+
+template<class T>
+auto make_vector(T&& single_item) {
+    std::vector<std::decay_t<T>> v;
+    v.push_back(std::move(single_item));
+    return v;
+}

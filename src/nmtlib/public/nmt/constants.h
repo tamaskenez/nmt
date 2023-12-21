@@ -30,3 +30,4 @@ inline const std::vector<MemberDefinitionMacro> k_memberDefinitionMacros = {
     MemberDefinitionMacro{"VIRTUAL", "virtual", ""},
     MemberDefinitionMacro{"EXPLICIT", "explicit", ""},
     MemberDefinitionMacro{"STATIC", "static", ""}};
+constexpr std::string_view k_dirConfigFileName = "#";

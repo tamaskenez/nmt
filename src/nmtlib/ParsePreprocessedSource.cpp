@@ -1,6 +1,8 @@
 #include "ParsePreprocessedSource.h"
 #include "TokenSearch.h"
 
+namespace fs = std::filesystem;
+
 namespace {
 std::string JoinTokensWithoutComments(
     std::span<const libtokenizer::Token> tokens,
@@ -77,7 +79,7 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
             // The `(` was also found.
             break;
         }
-        // Backtract, start over from where the clasName was found.
+        // Backtract, start over from where the className was found.
         tokens = tokens.subspan(firstTokenIdx + 1);
     }
     if (openingParenIdx == SIZE_T_MAX) {
@@ -85,9 +87,10 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
     }
     tokens = tokens.subspan(openingParenIdx);
     size_t openingBraceIdx = SIZE_T_MAX;
+    size_t closingParenIdx = SIZE_T_MAX;
     auto searchResult = std::move(TokenSearch(tokens)
                                       .Eat(TokenType::tok, "(")
-                                      .Eat(TokenType::tok, ")")
+                                      .Eat(TokenType::tok, ")", &closingParenIdx)
                                       .Find(TokenType::tok, "{", &openingBraceIdx)
                                       .Eat(TokenType::tok, "}")
                                       .AssertEnd())
@@ -99,23 +102,34 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
     if (classNameAndDoubleColonTokens) {
         exceptTokens = std::span<const Token*>(*classNameAndDoubleColonTokens);
     }
-    return JoinTokensWithoutComments(
-               std::span<const Token>(tokens0.data(), tokens.data() + openingBraceIdx),
-               exceptTokens)
+    size_t endIdx = SIZE_T_MAX;
+    if (className && *className == name) {
+        for (auto i = closingParenIdx + 1; i < openingBraceIdx; ++i) {
+            if (tokens[i].IsSingleCharToken() && tokens[i].value == ":") {
+                endIdx = i;
+                break;
+            }
+        }
+    } else {
+        endIdx = openingBraceIdx;
+    }
+    return JoinTokensWithoutComments(std::span<const Token>(tokens0.data(), tokens.data() + endIdx),
+                                     exceptTokens)
          + ';';
 }
-}  // namespace
 
-std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSource(
-    std::string_view name,
-    const PreprocessedSource& pps,
-    std::optional<std::string_view> parentDirName) {
-    struct Collector {
-        std::optional<Visibility> visibility;
-        std::optional<EntityKind> entityKind;
-        std::vector<std::string> fdneeds, needs, defneeds;
-    } c;
-    for (auto& sc : pps.specialComments) {
+struct Collector {
+    std::optional<Visibility> visibility;
+    std::optional<EntityKind> entityKind;
+    std::vector<std::string> fdneeds, needs, defneeds;
+    std::optional<fs::path> subdir;
+};
+
+std::expected<Collector, std::vector<std::string>> collectSpecialComments(
+    const std::vector<SpecialComment>& specialComments) {
+    Collector c;
+    std::vector<std::string> errors;
+    for (auto& sc : specialComments) {
         if (auto keyword = enum_from_name<SpecialCommentKeyword>(sc.keyword)) {
             auto addToNeeds = [&sc](std::vector<std::string>& v) {
                 v.reserve(v.size() + sc.list.size());
@@ -135,46 +149,83 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                     break;
                 case SpecialCommentKeyword::visibility:
                     if (c.visibility) {
-                        return std::unexpected(fmt::format("Duplicated `#visibility`, first value: "
-                                                           "{}, second value: {}",
-                                                           enum_name<Visibility>(*c.visibility),
-                                                           fmt::join(sc.list, ", ")));
+                        errors.push_back(
+                            fmt::format("Multiple `#visibility` annotations, previous value: "
+                                        "{}, second value: {}",
+                                        enum_name<Visibility>(*c.visibility),
+                                        fmt::join(sc.list, ", ")));
+                        break;
                     }
                     if (sc.list.size() != 1) {
-                        return std::unexpected(
-                            fmt::format("`#visibility` need a single value, got: {}",
-                                        fmt::join(sc.list, ", ")));
+                        errors.push_back(fmt::format("`#visibility` needs a single value, got: {}",
+                                                     fmt::join(sc.list, ", ")));
+                        break;
                     }
                     c.visibility = enum_from_name<Visibility>(sc.list.front());
                     if (!c.visibility) {
-                        return std::unexpected(
+                        errors.push_back(
                             fmt::format("Invalid `#visibility` value: {}", sc.list.front()));
+                        break;
                     }
+                    break;
+                case SpecialCommentKeyword::subdir:
+                    if (c.subdir) {
+                        errors.push_back(fmt::format("Multiple `#subdir` annotations, first value: "
+                                                     "{}, second value: {}",
+                                                     *c.subdir,
+                                                     fmt::join(sc.list, ", ")));
+                        break;
+                    }
+                    if (sc.list.size() != 1) {
+                        errors.push_back(fmt::format("`#subdir` needs a single value, got: {}",
+                                                     fmt::join(sc.list, ", ")));
+                        break;
+                    }
+                    c.subdir = path_from_string(sc.list.front());
                     break;
             }
         } else if (auto entityKind = enum_from_name<EntityKind>(sc.keyword)) {
             if (!sc.list.empty()) {
-                return std::unexpected(fmt::format(
+                errors.push_back(fmt::format(
                     "Unexpected list after `{}`: {}", sc.keyword, fmt::join(sc.list, ", ")));
+                break;
             }
             if (c.entityKind) {
-                return std::unexpected(fmt::format("Duplicated kind, first: {}, then: {}",
-                                                   enum_name(*c.entityKind),
-                                                   enum_name(*entityKind)));
+                errors.push_back(fmt::format("Duplicated kind, first: {}, then: {}",
+                                             enum_name(*c.entityKind),
+                                             enum_name(*entityKind)));
+                break;
             }
             c.entityKind = *entityKind;
         } else {
-            return std::unexpected(fmt::format("Invalid keyword: {}", sc.keyword));
+            errors.push_back(fmt::format("Invalid keyword: {}", sc.keyword));
+            break;
         }
     }
+    if (errors.empty()) {
+        return c;
+    }
+    return std::unexpected(std::move(errors));
+}
+}  // namespace
+
+std::expected<ParsePreprocessedSourceResult, std::vector<std::string>> ParsePreprocessedSource(
+    const PreprocessedSource& pps, const fs::path& sourcePath) {
+    std::string name = path_to_string(sourcePath.stem());
+    std::optional<std::string> parentDirName;
+    if (sourcePath.has_parent_path()) {
+        parentDirName = path_to_string(sourcePath.parent_path().stem());
+    }
+
+    TRY_ASSIGN(c, collectSpecialComments(pps.specialComments));
     if (!c.entityKind) {
-        return std::unexpected(fmt::format("Missing `#<entity>` ({})",
-                                           fmt::join(enum_traits<EntityKind>::names, ", ")));
+        return std::unexpected(make_vector(fmt::format(
+            "Missing `#<entity>` ({})", fmt::join(enum_traits<EntityKind>::names, ", "))));
     }
     //
-    std::ranges::sort(c.fdneeds);
-    std::ranges::sort(c.needs);
-    std::ranges::sort(c.defneeds);
+    sort_unique_inplace(c.fdneeds);
+    sort_unique_inplace(c.needs);
+    sort_unique_inplace(c.defneeds);
     CHECK(!pps.specialComments.empty());
     // Find the token corresponding to the first specialComment.
     auto firstSpecialCommentKeyword = pps.specialComments.front().keyword;
@@ -220,7 +271,9 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         case EntityKind::enum_: {
             allowed.fdneeds = true;
             allowed.needs = true;
-            TRY(checkNeeds());
+            if (auto cnr = checkNeeds(); !cnr) {
+                return std::unexpected(make_vector(std::move(cnr.error())));
+            }
             // Expected: enum ... name ... { ... } ;
             size_t enumIdx = SIZE_T_MAX;
             size_t openingBraceIdx = SIZE_T_MAX;
@@ -233,8 +286,8 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
                                               .AssertEnd())
                                     .FinishSearch();
             if (!searchResult.has_value()) {
-                return std::unexpected(
-                    fmt::format("Invalid enum declaration ({})", searchResult.error()));
+                return std::unexpected(make_vector(
+                    fmt::format("Invalid enum declaration ({})", searchResult.error())));
             }
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(EntityKind::enum_)>,
@@ -249,11 +302,14 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         case EntityKind::fn: {
             allowed.needs = true;
             allowed.defneeds = true;
-            TRY(checkNeeds());
+            if (auto cnr = checkNeeds(); !cnr) {
+                return std::unexpected(make_vector(std::move(cnr.error())));
+            }
             // Expected: ... name ( ... ) ... { ... }
-            TRY_ASSIGN(
+            TRY_ASSIGN_OR_RETURN_VALUE(
                 declaration,
-                ExtractFunctionDeclaration(std::nullopt, name, tokensFromFirstSpecialComment));
+                ExtractFunctionDeclaration(std::nullopt, name, tokensFromFirstSpecialComment),
+                std::unexpected(make_vector(std::move(UNEXPECTED_ERROR))));
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(EntityKind::fn)>,
                 EntityDependentProperties::Fn{.declaration = std::move(declaration),
@@ -263,7 +319,9 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         case EntityKind::struct_: {
             allowed.fdneeds = true;
             allowed.needs = true;
-            TRY(checkNeeds());
+            if (auto cnr = checkNeeds(); !cnr) {
+                return std::unexpected(make_vector(std::move(cnr.error())));
+            }
 
             // Expected: ... `struct` attributes-opt name (`:` ...)? `{` ... `}` `;`
             // TRY_ASSIGN(declaration, ExtractClassOrStructDeclaration(StructOrClass::struct_, name,
@@ -279,7 +337,9 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         case EntityKind::class_: {
             allowed.fdneeds = true;
             allowed.needs = true;
-            TRY(checkNeeds());
+            if (auto cnr = checkNeeds(); !cnr) {
+                return std::unexpected(make_vector(std::move(cnr.error())));
+            }
             // Expected: ... `class` attributes-opt name (`:` ...)? `{` ... `}` `;`
             // TRY_ASSIGN(declaration, ExtractClassOrStructDeclaration(StructOrClass::class_, name,
             // tokensFromFirstSpecialComment));
@@ -292,7 +352,9 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         } break;
         case EntityKind::header: {
             allowed.needs = true;
-            TRY(checkNeeds());
+            if (auto cnr = checkNeeds(); !cnr) {
+                return std::unexpected(make_vector(std::move(cnr.error())));
+            }
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(EntityKind::header)>,
                 EntityDependentProperties::Header{.declarationNeeds = std::move(c.needs)});
@@ -300,11 +362,14 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
         case EntityKind::memfn: {
             allowed.needs = true;
             allowed.defneeds = true;
-            TRY(checkNeeds());
+            if (auto cnr = checkNeeds(); !cnr) {
+                return std::unexpected(make_vector(std::move(cnr.error())));
+            }
             // Expected: ... classname :: name ( ... ) ... { ... }
-            TRY_ASSIGN(
+            TRY_ASSIGN_OR_RETURN_VALUE(
                 declaration,
-                ExtractFunctionDeclaration(parentDirName, name, tokensFromFirstSpecialComment));
+                ExtractFunctionDeclaration(parentDirName, name, tokensFromFirstSpecialComment),
+                std::unexpected(make_vector(std::move(UNEXPECTED_ERROR))));
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(EntityKind::memfn)>,
                 EntityDependentProperties::MemFn{.declaration = std::move(declaration),
@@ -314,6 +379,24 @@ std::expected<ParsePreprocessedSourceResult, std::string> ParsePreprocessedSourc
     }
     CHECK(dependentProps);
 
-    return ParsePreprocessedSourceResult{.visibility = c.visibility,
+    return ParsePreprocessedSourceResult{.name = std::move(name),
+                                         .visibility = c.visibility,
                                          .dependentProps = std::move(*dependentProps)};
+}
+
+std::expected<DirConfigFile, std::vector<std::string>> ParseDirConfigFile(
+    const std::vector<SpecialComment>& specialComments, const std::filesystem::path& sourcePath) {
+    CHECK(path_to_string(sourcePath.stem()) == k_dirConfigFileName);
+
+    std::vector<std::string> errors;
+
+    TRY_ASSIGN(c, collectSpecialComments(specialComments));
+
+    if (!sourcePath.has_parent_path()) {
+        errors.push_back("Directory config file has no parent path");
+    }
+    if (errors.empty()) {
+        return DirConfigFile{.parentDir = sourcePath.parent_path(), .subdir = std::move(c.subdir)};
+    }
+    return std::unexpected(std::move(errors));
 }

@@ -75,15 +75,15 @@ struct Entity {
 
     EntityDependentProperties::V dependentProps;
 
-    std::string HeaderFilename() const {
-        return fmt::format("{}.h", name);
+    /// 4-char hex hash string from sourcePath, to make certain derived filenames unique.
+    std::string shortHash() const {
+        return fmt::format("{:04x}", path_hash{}(sourcePath)&0xffff);
     }
+    std::string HeaderFilename(bool allowShortHashPostfix) const;
     // The file which is injected into a class/struct declaration.
-    std::string MemberDeclarationsFilename() const {
-        return fmt::format("{}#member_declarations.h", name);
-    }
+    std::string MemberDeclarationsFilename() const;
     std::string DefinitionFilename() const {
-        return fmt::format("{}.cpp", name);
+        return fmt::format("{}-{}.cpp", name, shortHash());
     }
     std::string MemFnClassName() const {
         CHECK(GetEntityKind() == EntityKind::memfn && sourcePath.has_parent_path());
@@ -98,17 +98,15 @@ struct Entity {
                 return k_privateSubdir;
         }
     }
-    std::filesystem::path HeaderSubdir() const {
-        return {};
+    std::filesystem::path HeaderPath(const std::filesystem::path& targetSubdir) const {
+        return VisibilitySubdir() / targetSubdir
+             / path_from_string(HeaderFilename(targetSubdir.empty()));
     }
-    std::filesystem::path HeaderPath() const {
-        return VisibilitySubdir() / HeaderSubdir() / path_from_string(HeaderFilename());
-    }
-    std::filesystem::path MemberDeclarationsPath() const {
-        return VisibilitySubdir() / HeaderSubdir() / path_from_string(MemberDeclarationsFilename());
+    std::filesystem::path MemberDeclarationsPath(const std::filesystem::path& targetSubdir) const {
+        return VisibilitySubdir() / targetSubdir / path_from_string(MemberDeclarationsFilename());
     }
     std::filesystem::path DefinitionPath() const {
-        return k_privateSubdir / HeaderSubdir() / path_from_string(DefinitionFilename());
+        return k_privateSubdir / path_from_string(DefinitionFilename());
     }
 
     void Print();

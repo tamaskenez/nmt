@@ -110,11 +110,12 @@ std::vector<Entities::Id> Entities::itemsWithEntities() const {
     return ids;
 }
 
-std::optional<Entities::Id> Entities::findByName(std::string_view name) const {
+std::optional<Entities::Id> Entities::findNonMemberByName(std::string_view name) const {
     // TODO add lookup table after namespace has been implemented.
     std::optional<Id> maybeId;
     for (auto& [k, v] : items) {
-        if (auto* e = std::get_if<Entity>(&v.state); e && e->name == name) {
+        if (auto* e = std::get_if<Entity>(&v.state);
+            e && e->name == name && !isMemberEntityKind(e->GetEntityKind())) {
             CHECK(!maybeId) << fmt::format(
                 "Two entities (#{} and #{}) with the same name: {}", *maybeId, k, name);
             maybeId = k;
@@ -142,9 +143,9 @@ void Entities::updateSourceCantReadFile(Id id) {
 }
 
 void Entities::updateSourceError(Id id,
-                                 std::string message,
+                                 std::vector<std::string> errors,
                                  std::filesystem::file_time_type lastWriteTime) {
     auto it = items.find(id);
     CHECK(it != items.end()) << fmt::format("Item id #{} doesn't exist", id);
-    it->second.state = ItemState::Error{std::move(message), lastWriteTime};
+    it->second.state = ItemState::Error{std::move(errors), lastWriteTime};
 }

@@ -117,33 +117,20 @@ int main(int argc, char* argv[]) {
     }
 
     Project project(args.outputDir);
-    for (auto& s : sources.resolvedSources) {
-        project.entities.addSource(s);
-    }
     std::vector<std::string> verboseMessages, errors;
+    for (auto& s : sources.resolvedSources) {
+        auto r = project.entities.addSource(s);
+        if (!r) {
+            errors.push_back(std::move(r.error()));
+        }
+    }
     for (auto id : project.entities.dirtySources()) {
-        auto& sourcePath = project.entities.sourcePath(id);
-        switch_variant(
-            ProcessSource(sourcePath),
-            [&](Entity&& x) {
-                project.entities.updateSourceWithEntity(id, std::move(x));
-            },
-            [&](ProcessSourceResult::SourceWithoutSpecialComments&& x) {
-                project.entities.updateSourceNoSpecialComments(id, x.lastWriteTime);
-                if (args.verbose) {
-                    verboseMessages.push_back(
-                        fmt::format("Ignoring file without NMT annotations: {}", sourcePath));
-                }
-            },
-            [&](ProcessSourceResult::CantReadFile) {
-                project.entities.updateSourceCantReadFile(id);
-                errors.push_back(fmt::format("Can't read file: {}", sourcePath));
-            },
-            [&](ProcessSourceResult::Error&& x) {
-                project.entities.updateSourceError(id, x.message, x.lastWriteTime);
-                errors.push_back(
-                    fmt::format("Failed to process file {}, reason: {}", sourcePath, x.message));
-            });
+        auto [newErrors, newVerboseMessages] =
+            ProcessSourceAndUpdateProject(project, id, args.verbose);
+        append_range(errors, std::move(newErrors));
+        if (args.verbose) {
+            append_range(verboseMessages, std::move(newVerboseMessages));
+        }
     }
     if (args.verbose) {
         for (auto& m : verboseMessages) {

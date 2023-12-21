@@ -1,4 +1,4 @@
 // #memfn
-void UserState::setProject(Project project) {
-    project = std::move(project);
+void UserState::setProject(Project projectArg) {
+    project = std::move(projectArg);
 }
