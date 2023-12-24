@@ -6,10 +6,12 @@
 
 struct QtUI : UI {
     QApplication _application;
+    const UserState* userState;
 
     QtUI(int& argc, char* argv[])
         : _application(argc, argv) {}
-    int exec() override {
+    int exec(const UserState* userStateArg) override {
+        userState = userStateArg;
         MainWindow mw;
         mw.show();
         return _application.exec();

@@ -1,8 +1,6 @@
 #pragma once
 
-#include <QMainWindow>
-
-class QTextEdit;
+class QSplitter;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -11,5 +9,4 @@ class MainWindow : public QMainWindow {
     MainWindow();
 
    private:
-    QTextEdit* editor;
 };

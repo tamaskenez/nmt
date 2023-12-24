@@ -13,3 +13,4 @@ target_link_libraries(qtui PRIVATE
 )
 
 target_include_directories(qtui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_precompile_headers(qtui PRIVATE pch.h)

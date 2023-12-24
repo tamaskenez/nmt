@@ -40,9 +40,9 @@ std::expected<TryEatCommaSeparateListResult, std::string> TryEatCommaSeparatedLi
             items.push_back(sv);
             sv = tv.substr(1);
         } else {
-            auto tv = EatWhileNot(sv.substr(1), " ,\t\n");
+            auto tv = EatWhileNot(sv.substr(1), ",\t\n");
             sv.remove_suffix(tv.size());
-            items.push_back(sv);
+            items.push_back(trim(sv));
             sv = tv;
         }
         sv = EatBlank(sv);

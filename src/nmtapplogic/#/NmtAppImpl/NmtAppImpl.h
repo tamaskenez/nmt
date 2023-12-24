@@ -4,4 +4,4 @@ EXPLICIT NmtAppImpl::NmtAppImpl(Project project)
     userState->project = std::move(project);
 }
 // #needs: "nmt/Project.h"
-// #defneeds: "nmt/Project.h"
+// #defneeds: <utility>, <memory>, "appcommon/UserState.h"

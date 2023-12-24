@@ -3,6 +3,7 @@ class UI {
    public:
     virtual ~UI() = default;
 
-    virtual int exec() = 0;
+    virtual int exec(const UserState* userState) = 0;
 };
 // #visibility: public
+// #needs: UserState*

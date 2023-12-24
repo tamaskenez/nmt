@@ -6,6 +6,23 @@
 namespace fs = std::filesystem;
 
 namespace {
+
+std::optional<std::string_view> ExtractIdentifier(std::string_view sv) {
+    auto r = trim(sv);
+    if (r.empty()) {
+        return std::nullopt;
+    }
+    if (isdigit(r.front())) {
+        return std::nullopt;
+    }
+    for (auto c : r) {
+        if (!isalnum(c) && c != '_') {
+            return std::nullopt;
+        }
+    }
+    return r;
+}
+
 struct IncludeSectionBuilder {
     IncludeSectionBuilder(
         fs::path outputDir,
@@ -91,39 +108,54 @@ struct IncludeSectionBuilder {
             if (need[0] == '<' || need[0] == '"') {
                 addHeader(need);
             } else {
-                std::string_view needName = need;
-                const bool refOnly = needName.back() == '*';
-                if (refOnly) {
-                    needName.remove_suffix(1);
-                }
-                if (needName == e.name) {
-                    errors.push_back(fmt::format("Entity `{}` can't include itself.", e.name));
-                    continue;
-                }
-                auto maybeId = entities.findNonMemberByName(needName);
-                if (!maybeId) {
-                    errors.push_back(
-                        fmt::format("Entity `{}` needs `{}` but it's missing.", e.name, needName));
-                    continue;
-                }
-                auto& ne = entities.entity(*maybeId);
-                if (refOnly) {
-                    auto* v = ne.ForwardDeclarationNeedsOrNull();
-                    if (v == nullptr) {
+                if (need.starts_with("struct ") || need.starts_with("class ")
+                    || need.starts_with("enum ")) {
+                    auto spaceIdx = need.find(' ');
+                    assert(spaceIdx != std::string_view::npos);
+                    auto identifier =
+                        ExtractIdentifier(need.substr(spaceIdx, need.size() - spaceIdx));
+                    if (!identifier) {
                         errors.push_back(
-                            fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
-                                        "be forward declared.",
-                                        e.name,
-                                        need,
-                                        enum_name(ne.GetEntityKind())));
+                            fmt::format("Forward declaration {} needs a c-identifier", need));
                         continue;
                     }
-                    additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
-                    forwardDeclarations.push_back(fmt::format("{}", ne.ForwardDeclaration()));
+                    forwardDeclarations.push_back(
+                        fmt::format("{} {};", need.substr(0, spaceIdx), *identifier));
                 } else {
-                    auto path =
-                        outputDir / ne.HeaderPath(sourcePathToTargetSubdirFn(ne.sourcePath));
-                    generateds.push_back(fmt::format("\"{}\"", path));
+                    std::string_view needName = need;
+                    const bool refOnly = needName.back() == '*';
+                    if (refOnly) {
+                        needName.remove_suffix(1);
+                    }
+                    if (needName == e.name) {
+                        errors.push_back(fmt::format("Entity `{}` can't include itself.", e.name));
+                        continue;
+                    }
+                    auto maybeId = entities.findNonMemberByName(needName);
+                    if (!maybeId) {
+                        errors.push_back(fmt::format(
+                            "Entity `{}` needs `{}` but it's missing.", e.name, needName));
+                        continue;
+                    }
+                    auto& ne = entities.entity(*maybeId);
+                    if (refOnly) {
+                        auto* v = ne.ForwardDeclarationNeedsOrNull();
+                        if (v == nullptr) {
+                            errors.push_back(
+                                fmt::format("Entity `{}` needs `{}` but it's a {} and can't "
+                                            "be forward declared.",
+                                            e.name,
+                                            need,
+                                            enum_name(ne.GetEntityKind())));
+                            continue;
+                        }
+                        additionalNeeds.insert(additionalNeeds.end(), BEGIN_END(*v));
+                        forwardDeclarations.push_back(fmt::format("{}", ne.ForwardDeclaration()));
+                    } else {
+                        auto path =
+                            outputDir / ne.HeaderPath(sourcePathToTargetSubdirFn(ne.sourcePath));
+                        generateds.push_back(fmt::format("\"{}\"", path));
+                    }
                 }
             }
         }
@@ -288,7 +320,12 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                 }
                 auto renderedHeadersOr = includes.render();
                 if (!renderedHeadersOr) {
-                    append_range(errors, std::move(renderedHeadersOr.error()));
+                    for (auto& error : renderedHeadersOr.error()) {
+                        errors.push_back(
+                            fmt::format("Failed generating boilerplate for {}, reason: {}",
+                                        e.sourcePath,
+                                        error));
+                    }
                     continue;
                 }
                 auto& renderedHeaders = *renderedHeadersOr;

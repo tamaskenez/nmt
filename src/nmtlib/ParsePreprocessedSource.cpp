@@ -52,8 +52,13 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
             size_t classNameIdx = SIZE_T_MAX;
             size_t doubleColonIdx = SIZE_T_MAX;
             search.Find(TokenType::id, *className, &classNameIdx)
-                .Eat(TokenType::tok, "::", &doubleColonIdx)
-                .Eat(TokenType::id, name);
+                .Eat(TokenType::tok, "::", &doubleColonIdx);
+            CHECK(!name.empty());
+            if (name[0] == '~') {
+                search.Eat(TokenType::tok, "~").Eat(TokenType::id, name.substr(1));
+            } else {
+                search.Eat(TokenType::id, name);
+            }
             if (classNameIdx != SIZE_T_MAX && doubleColonIdx != SIZE_T_MAX) {
                 classNameAndDoubleColonTokens.emplace();
                 (*classNameAndDoubleColonTokens)[0] = &tokens[classNameIdx];
@@ -72,7 +77,7 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
             // backtrack.
             return std::unexpected(
                 className ? fmt::format(
-                    "Pattern <class-name>::<memfn-name> not found ({}::{})", className, name)
+                    "Pattern <class-name>::<memfn-name> not found ({}::{})", *className, name)
                           : fmt::format("Pattern <fn-name> not found ({})", name));
         }
         if (searchResult.has_value()) {

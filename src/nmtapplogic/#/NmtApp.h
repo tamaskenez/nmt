@@ -1,5 +1,4 @@
 // #class
-class UI;
 class NmtApp {
    public:
     virtual ~NmtApp() = default;
@@ -10,4 +9,4 @@ class NmtApp {
 };
 
 // #visibility: public
-// #needs: <memory>
+// #needs: <memory>, class UI

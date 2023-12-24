@@ -4,4 +4,4 @@ struct NmtAppImpl : NmtApp {
     std::unique_ptr<UserState> userState;
 #include NMT_MEMBER_DECLARATIONS
 };
-// #needs: NmtApp, "appcommon/UserState.h", <memory>
+// #needs: NmtApp, <memory>, struct UserState
