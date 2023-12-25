@@ -1,3 +1,4 @@
+#include <QApplication>
 #include <QDir>
 #include <QFileSystemModel>
 #include <QHBoxLayout>
