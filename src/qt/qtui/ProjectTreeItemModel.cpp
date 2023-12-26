@@ -1,6 +1,32 @@
 #include "ProjectTreeItemModel.h"
 
 #include "nmt/Project.h"
+#include "nmt/base_types.h"
+
+/*
+struct Subdir {
+    std::vector<SubdirId> subdirs;
+    std::vector<EntityId> entities;
+};
+
+map<SubdirId, Subdir> subdirs;
+map<fs::path, SubdirId>
+
+{
+    Subdirid, parentsubdirid
+    entityid
+    memfnentityid
+}
+
+Subdir {
+    Subdir*
+    (Header|Class|Struct|Fn)*
+}
+
+Class, Struct {
+    MemFn*
+}
+*/
 
 struct ProjectTreeItemModel : public QAbstractItemModel {
     explicit ProjectTreeItemModel(const std::optional<Project>& project, QObject* parent)
@@ -9,8 +35,28 @@ struct ProjectTreeItemModel : public QAbstractItemModel {
 
     const std::optional<Project>& project;
 
+    /*
+    struct Subdir {
+        std::map<std::string, int64_t> subdirs;
+    };
+    flat_hash_map<int64_t, Subdir> idToSubdir;
+
+    void f() {
+        constexpr int64_t k_rootSubdirId = 0;
+        for (auto& [k, v] : project->entities.items) {
+            auto it = v.sourcePath.begin();
+            CHECK(it != v.sourcePath.end());
+            auto subdirId = getOrMakeSubdir(path_to_string(*it), k_rootSubdirId);
+            auto s = ;
+            roots.insert(std::make_pair(s,
+            for(auto&pc:v.sourcePath){
+                if(
+            }
+        }
+    }
+*/
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override {
-        if (!index.isValid()) {
+        if (!index.isValid() || index.column() != 0) {
             return QVariant();
         }
 
