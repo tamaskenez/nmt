@@ -93,3 +93,6 @@ auto make_vector(T&& single_item) {
     v.push_back(std::move(single_item));
     return v;
 }
+
+bool isCanonicalPathPrefixOfOther(const std::filesystem::path& parent,
+                                  const std::filesystem::path& child);

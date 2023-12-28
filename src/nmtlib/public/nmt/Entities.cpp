@@ -4,17 +4,20 @@ namespace fs = std::filesystem;
 namespace ItemState = EntitiesItemState;
 using namespace vx;
 
-std::expected<std::monostate, std::string> Entities::addSource(const std::filesystem::path& path) {
+std::expected<std::monostate, std::string> Entities::addSource(int64_t targetId,
+                                                               const fs::path& targetSourceDir,
+                                                               const std::filesystem::path& path) {
     std::error_code ec;
     auto canonicalPath = fs::weakly_canonical(path, ec);
     if (ec) {
         return std::unexpected(fmt::format("Can't get canonical path: {}", ec.message()));
     }
+    CHECK(isCanonicalPathPrefixOfOther(targetSourceDir, path));
     const auto id = nextId++;
     auto itb = sourcePathToId.insert(std::make_pair(std::move(canonicalPath), id));
     if (itb.second) {
         const auto& sourcePath = itb.first->first;
-        items.insert(std::make_pair(id, Item{sourcePath, ItemState::NewSource{}}));
+        items.insert(std::make_pair(id, Item{targetId, sourcePath, ItemState::NewSource{}}));
     } else {
         DCHECK(itb.second) << fmt::format("Duplicated source: {}", path);
     }

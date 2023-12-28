@@ -30,6 +30,8 @@ class Entities {
     using Id = int64_t;
     /// Adding a source which has already been added is an error in Debug, ignored in Release.
     [[nodiscard]] std::expected<std::monostate, std::string> addSource(
+        int64_t targetId,
+        const std::filesystem::path& targetSourceDir,
         const std::filesystem::path& path);
     /// Return out-of-date sources and sources with errors, sorted by sourcePath.
     std::vector<Id> dirtySources() const;
@@ -51,6 +53,7 @@ class Entities {
 
    private:
     struct Item {
+        int64_t targetId;
         const std::filesystem::path& sourcePath;  // points to sourcePathToId keys
         EntitiesItemState::V state;
     };

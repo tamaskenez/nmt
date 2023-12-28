@@ -6,8 +6,9 @@
 
 struct ProgramOptions {
     bool verbose = false;
-    std::vector<std::filesystem::path> sources;
+    std::filesystem::path sourceDir;
     std::filesystem::path outputDir;
+    std::string target;
 };
 
 std::expected<ProgramOptions, int> ParseProgramOptions(int argc, char* argv[]);

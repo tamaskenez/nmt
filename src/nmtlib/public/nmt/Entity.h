@@ -67,6 +67,7 @@ inline void AssertVariantIndices(EntityKind k) {
 struct Entity {
     static constexpr Visibility k_defaultVisibility = Visibility::private_;
 
+    int64_t targetId = 0;
     std::string name;  // Unqualified name.
     std::filesystem::path sourcePath;
     std::filesystem::file_time_type lastWriteTime;

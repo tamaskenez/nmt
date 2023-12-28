@@ -1,8 +1,8 @@
 #include "nmt/GenerateBoilerplate.h"
+#include "nmt/GlobSourceFiles.h"
 #include "nmt/ProcessSource.h"
 #include "nmt/ProgramOptions.h"
 #include "nmt/Project.h"
-#include "nmt/ResolveSourcesFromCommandLine.h"
 
 namespace fs = std::filesystem;
 
@@ -106,9 +106,11 @@ int main(int argc, char* argv[]) {
 
     fmt::print("### NMT ###\n");
 
-    auto sourcesOr = ResolveSourcesFromCommandLine(args.sources, args.verbose);
+    auto sourcesOr = GlobSourceFiles(args.sourceDir, args.verbose);
     if (!sourcesOr) {
-        fmt::print(stderr, "{}\n", sourcesOr.error());
+        for (auto& m : sourcesOr.error()) {
+            fmt::print(stderr, "Error: {}\n", m);
+        }
         return EXIT_FAILURE;
     }
     auto sources = std::move(*sourcesOr);
@@ -116,10 +118,19 @@ int main(int argc, char* argv[]) {
         fmt::print("{}\n", m);
     }
 
-    Project project(args.outputDir);
+    Project project;
+    auto addTargetResult = project.addTarget(args.target, args.sourceDir, args.outputDir);
+    if (!addTargetResult) {
+        for (auto& m : addTargetResult.error()) {
+            fmt::print(stderr, "Error: can't add target {}, reason: ", args.target, m);
+        }
+        return EXIT_FAILURE;
+    }
+    auto targetId = *addTargetResult;
+    auto& target = project.targets.at(targetId);
     std::vector<std::string> verboseMessages, errors;
-    for (auto& s : sources.resolvedSources) {
-        auto r = project.entities.addSource(s);
+    for (auto& s : sources.sources) {
+        auto r = project.entities.addSource(targetId, target.sourceDir, s);
         if (!r) {
             errors.push_back(std::move(r.error()));
         }

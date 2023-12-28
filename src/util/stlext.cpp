@@ -21,3 +21,9 @@ std::filesystem::path path_from_string(std::string_view sv) {
     auto p = reinterpret_cast<const char8_t*>(sv.data());
     return std::filesystem::path(p, p + sv.size());
 }
+
+bool isCanonicalPathPrefixOfOther(const std::filesystem::path& parent,
+                                  const std::filesystem::path& child) {
+    auto mr = std::ranges::mismatch(parent, child);
+    return mr.in1 == parent.end() && mr.in2 != child.end();
+}

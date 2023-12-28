@@ -13,7 +13,6 @@ constexpr std::string_view k_emptyHeaderFilename = "#empty.h";
 constexpr std::string_view k_fileListFilename = "files.txt";
 
 inline const std::set<std::filesystem::path> k_validSourceExtensions = {".h", ".hpp", ".hxx"};
-inline const std::set<std::filesystem::path> k_fileListExtensions = {".txt", ".lst"};
 
 constexpr std::string_view k_nmtIncludeMemberDeclarationsMacro = "NMT_MEMBER_DECLARATIONS";
 
