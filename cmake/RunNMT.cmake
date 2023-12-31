@@ -1,6 +1,6 @@
 function(run_nmt target)
 	cmake_parse_arguments(PARSE_ARGV 1 ARG
-		""
+		"PRIVATE_TARGET_DIR_TO_PATH"
 		"SOURCE_DIR"
 		"")
 	if(NOT ARG_SOURCE_DIR)
@@ -38,9 +38,18 @@ function(run_nmt target)
 	source_group(boilerplate FILES ${output_dir}/files.txt ${generated_files})
 	target_sources(${target} PRIVATE ${output_dir}/files.txt ${generated_files})
 	target_include_directories(${target}
-		PUBLIC ${output_dir}/public
-		PRIVATE ${output_dir}/private
+		PUBLIC
+			${output_dir}/public
+		PRIVATE
+			${output_dir}/private
 	)
+
+	if(ARG_PRIVATE_TARGET_DIR_TO_PATH)
+		target_include_directories(${target}
+			PRIVATE
+				${output_dir}/private/${target}
+		)
+	endif()
 
 	add_custom_command(TARGET ${target}
 	                   PRE_BUILD

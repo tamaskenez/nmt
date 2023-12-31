@@ -48,9 +48,9 @@ std::optional<int64_t> Project::findTargetByName(std::string_view name) const {
 fs::path decoratedTargetNameSubdir(std::string_view targetName, Visibility visibility) {
     switch (visibility) {
         case Visibility::public_:
-            return path_from_string(targetName);
+            return k_publicSubdir / path_from_string(targetName);
         case Visibility::private_:
-            return path_from_string(fmt::format("{}{}", targetName, k_privateTargetNamePostfix));
+            return k_privateSubdir / path_from_string(targetName);
     }
 }
 

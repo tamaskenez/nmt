@@ -16,7 +16,8 @@ inline const std::set<std::filesystem::path> k_validSourceExtensions = {".h", ".
 
 constexpr std::string_view k_nmtIncludeMemberDeclarationsMacro = "NMT_MEMBER_DECLARATIONS";
 
-constexpr std::string_view k_privateTargetNamePostfix = "#private";
+inline const std::filesystem::path k_publicSubdir = "public";
+inline const std::filesystem::path k_privateSubdir = "private";
 constexpr std::string_view k_memberDeclarationsFilenamePostfix = "#memberDecls";
 
 struct MemberDefinitionMacro {

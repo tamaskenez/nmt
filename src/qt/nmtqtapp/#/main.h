@@ -11,4 +11,4 @@ int main(int argc, char* argv[]) {
     auto& app = *appOr;
     return app->run(std::move(ui));
 }
-// #defneeds: "QtUI.h", "NmtApp.h", <utility>, <cassert>, <fmt/core.h>
+// #defneeds: "QtUI.h", "nmtapplogic/NmtApp.h", <utility>, <cassert>, <fmt/core.h>
