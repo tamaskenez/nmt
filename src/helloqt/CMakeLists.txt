@@ -12,8 +12,6 @@ qt_add_executable(helloqt
     ${sources}
 )
 
-run_nmt(helloqt FILES ${sources})
-
 target_compile_definitions(helloqt
   PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:QT_QML_DEBUG>)
 target_link_libraries(helloqt
