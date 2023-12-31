@@ -29,4 +29,9 @@ struct Project {
                                                   std::filesystem::path outputDir);
     /// Return: target id
     std::optional<int64_t> findTargetByName(std::string_view name) const;
+
+    std::filesystem::path headerPath(bool relativeToOutputDir, int64_t entityId) const;
+    std::filesystem::path cppPath(bool relativeToOutputDir, int64_t entityId) const;
+    std::filesystem::path memberDeclarationsPath(bool relativeToOutputDir, int64_t entityId) const;
+    std::filesystem::path emptyHeaderPath(bool relativeToOutputDir, int64_t targetId) const;
 };

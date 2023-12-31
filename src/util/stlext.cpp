@@ -2,6 +2,8 @@
 
 #include <cctype>
 
+namespace fs = std::filesystem;
+
 std::string_view trim(std::string_view sv) {
     while (!sv.empty() && isspace(sv.front())) {
         sv.remove_prefix(1);
@@ -27,3 +29,30 @@ bool isCanonicalPathPrefixOfOther(const std::filesystem::path& parent,
     auto mr = std::ranges::mismatch(parent, child);
     return mr.in1 == parent.end() && mr.in2 != child.end();
 }
+
+std::optional<fs::path> relativePathIfCanonicalPrefixOrNullopt(const std::filesystem::path& parent,
+                                                               const std::filesystem::path& child) {
+    auto mr = std::ranges::mismatch(parent, child);
+    if (mr.in1 == parent.end() && mr.in2 != child.end()) {
+        fs::path result;
+        for (auto it = mr.in2; it != child.end(); ++it) {
+            result /= *it;
+        }
+        return result;
+    }
+    return std::nullopt;
+}
+
+/*
+std::optional<std::filesystem::path> parent_dirname(const std::filesystem::path& p) {
+    auto it = p.end();
+    if (it == p.begin()) {
+        return std::nullopt;
+    }
+    --it;
+    if (it == p.begin()) {
+        return std::nullopt;
+    }
+    return *it;
+}
+*/

@@ -30,6 +30,7 @@ GeneratedFileWriter::~GeneratedFileWriter() {
     RemoveRemainingExistingFilesAndDirs();
 }
 void GeneratedFileWriter::Write(const fs::path& relPath, std::string_view content) {
+    // Create all parent directories.
     auto relDir = relPath;
     bool firstParent = true;
     for (; relDir.has_parent_path();) {
@@ -42,7 +43,6 @@ void GeneratedFileWriter::Write(const fs::path& relPath, std::string_view conten
         }
         firstParent = false;
     }
-    bool create_directories(const std::filesystem::path& p, std::error_code& ec);
 
     auto path = outputDir / relPath;
     remainingExistingFiles.erase(path);

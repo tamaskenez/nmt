@@ -70,45 +70,12 @@ struct Entity {
     int64_t targetId = 0;
     std::string name;  // Unqualified name.
     std::filesystem::path sourcePath;
-    std::filesystem::file_time_type lastWriteTime;
+    std::filesystem::path sourceRelPath;
+    std::filesystem::file_time_type lastWriteTime = std::filesystem::file_time_type::min();
     std::optional<std::string> namespace_;
     Visibility visibility = Visibility::private_;
 
     EntityDependentProperties::V dependentProps;
-
-    /// 4-char hex hash string from sourcePath, to make certain derived filenames unique.
-    std::string shortHash() const {
-        return fmt::format("{:04x}", path_hash{}(sourcePath)&0xffff);
-    }
-    std::string HeaderFilename(bool allowShortHashPostfix) const;
-    // The file which is injected into a class/struct declaration.
-    std::string MemberDeclarationsFilename() const;
-    std::string DefinitionFilename() const {
-        return fmt::format("{}-{}.cpp", name, shortHash());
-    }
-    std::string MemFnClassName() const {
-        CHECK(GetEntityKind() == EntityKind::memfn && sourcePath.has_parent_path());
-        return path_to_string(sourcePath.parent_path().filename());
-    }
-
-    std::filesystem::path VisibilitySubdir() const {
-        switch (visibility) {
-            case Visibility::public_:
-                return k_publicSubdir;
-            case Visibility::private_:
-                return k_privateSubdir;
-        }
-    }
-    std::filesystem::path HeaderPath(const std::filesystem::path& targetSubdir) const {
-        return VisibilitySubdir() / targetSubdir
-             / path_from_string(HeaderFilename(targetSubdir.empty()));
-    }
-    std::filesystem::path MemberDeclarationsPath(const std::filesystem::path& targetSubdir) const {
-        return VisibilitySubdir() / targetSubdir / path_from_string(MemberDeclarationsFilename());
-    }
-    std::filesystem::path DefinitionPath() const {
-        return k_privateSubdir / path_from_string(DefinitionFilename());
-    }
 
     void Print();
 

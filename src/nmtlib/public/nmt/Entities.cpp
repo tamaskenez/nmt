@@ -102,6 +102,12 @@ const std::filesystem::path& Entities::sourcePath(Id id) const {
     return it->second.sourcePath;
 }
 
+int64_t Entities::targetId(Id id) const {
+    auto it = items.find(id);
+    CHECK(it != items.end()) << fmt::format("Item#{} not found", id);
+    return it->second.targetId;
+}
+
 std::vector<Entities::Id> Entities::itemsWithEntities() const {
     std::vector<Id> ids;
     ids.reserve(items.size());
@@ -113,14 +119,30 @@ std::vector<Entities::Id> Entities::itemsWithEntities() const {
     return ids;
 }
 
-std::optional<Entities::Id> Entities::findNonMemberByName(std::string_view name) const {
+std::optional<Entities::Id> Entities::findNonMemberByName(int64_t targetId,
+                                                          std::string_view name) const {
+    // TODO add lookup table after namespace has been implemented.
+    std::optional<Id> maybeId;
+    for (auto& [k, v] : items) {
+        if (auto* e = std::get_if<Entity>(&v.state); e && e->name == name && e->targetId == targetId
+                                                     && !isMemberEntityKind(e->GetEntityKind())) {
+            CHECK(!maybeId) << fmt::format(
+                "Two entities (#{} and #{}) with the same name: {}", *maybeId, k, name);
+            maybeId = k;
+        }
+    }
+    return maybeId;
+}
+
+std::optional<Entities::Id> Entities::findEntityBySourcePath(int64_t targetId,
+                                                             const std::filesystem::path& p) const {
     // TODO add lookup table after namespace has been implemented.
     std::optional<Id> maybeId;
     for (auto& [k, v] : items) {
         if (auto* e = std::get_if<Entity>(&v.state);
-            e && e->name == name && !isMemberEntityKind(e->GetEntityKind())) {
+            e && e->sourcePath == p && e->targetId == targetId) {
             CHECK(!maybeId) << fmt::format(
-                "Two entities (#{} and #{}) with the same name: {}", *maybeId, k, name);
+                "Two entities (#{} and #{}) with the same sourcePath: {}", *maybeId, k, p);
             maybeId = k;
         }
     }

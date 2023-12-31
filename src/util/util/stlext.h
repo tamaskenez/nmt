@@ -96,3 +96,13 @@ auto make_vector(T&& single_item) {
 
 bool isCanonicalPathPrefixOfOther(const std::filesystem::path& parent,
                                   const std::filesystem::path& child);
+
+/// Return `std::filesystem::relative(child, parent)` if `parent` is a prefix of `child`, `nullopt`
+/// otherwise. UB if paths are not (weakly) canonical.
+std::optional<std::filesystem::path> relativePathIfCanonicalPrefixOrNullopt(
+    const std::filesystem::path& parent, const std::filesystem::path& child);
+
+/*
+/// Return `p.parent_path().stem()` if `p.has_parent_path()`, `nullopt` otherwise.
+std::optional<std::filesystem::path> parent_dirname(const std::filesystem::path& p);
+*/

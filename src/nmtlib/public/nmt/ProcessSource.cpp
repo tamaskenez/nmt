@@ -5,7 +5,11 @@
 #include "PreprocessSource.h"
 #include "ReadFile.h"
 
-ProcessSourceResult::V ProcessSource(const std::filesystem::path& sourcePath) {
+namespace fs = std::filesystem;
+
+ProcessSourceResult::V ProcessSource(int64_t targetId,
+                                     const fs::path& targetRootSourceDir,
+                                     const std::filesystem::path& sourcePath) {
     TRY_ASSIGN_OR_RETURN_VALUE(
         sourceContent, ReadFile(sourcePath), ProcessSourceResult::CantReadFile{});
     TRY_ASSIGN_OR_RETURN_VALUE(
@@ -27,8 +31,16 @@ ProcessSourceResult::V ProcessSource(const std::filesystem::path& sourcePath) {
                                    ParsePreprocessedSource(pps, sourcePath),
                                    (ProcessSourceResult::Error{std::move(UNEXPECTED_ERROR)}));
 
-        return Entity{.name = ep.name,
+        auto sourceRelPath =
+            relativePathIfCanonicalPrefixOrNullopt(targetRootSourceDir, sourcePath);
+        CHECK(sourceRelPath) << fmt::format(
+            "Source path `{}` supposed to be under the target's root source directory `{}`",
+            sourcePath,
+            targetRootSourceDir);
+        return Entity{.targetId = targetId,
+                      .name = ep.name,
                       .sourcePath = sourcePath,
+                      .sourceRelPath = *sourceRelPath,
                       .visibility = ep.visibility.value_or(Entity::k_defaultVisibility),
                       .dependentProps = std::move(ep.dependentProps)};
     }
@@ -43,8 +55,9 @@ std::pair<std::vector<std::string>, std::vector<std::string>> ProcessSourceAndUp
     if (ec) {
         lastWriteTime = std::filesystem::file_time_type::min();
     }
+    auto targetId = project.entities.targetId(id);
     switch_variant(
-        ProcessSource(sourcePath),
+        ProcessSource(targetId, project.targets.at(targetId).sourceDir, sourcePath),
         [&](Entity&& x) {
             project.entities.updateSourceWithEntity(id, std::move(x));
         },

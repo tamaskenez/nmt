@@ -5,5 +5,5 @@
 
 struct DirConfigFile {
     std::filesystem::path parentDir;
-    std::optional<std::filesystem::path> subdir;
+    std::optional<std::string> namespace_;
 };

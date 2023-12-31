@@ -127,7 +127,7 @@ struct Collector {
     std::optional<Visibility> visibility;
     std::optional<EntityKind> entityKind;
     std::vector<std::string> fdneeds, needs, defneeds;
-    std::optional<fs::path> subdir;
+    std::optional<std::string> namespace_;
 };
 
 std::expected<Collector, std::vector<std::string>> collectSpecialComments(
@@ -173,20 +173,21 @@ std::expected<Collector, std::vector<std::string>> collectSpecialComments(
                         break;
                     }
                     break;
-                case SpecialCommentKeyword::subdir:
-                    if (c.subdir) {
-                        errors.push_back(fmt::format("Multiple `#subdir` annotations, first value: "
-                                                     "{}, second value: {}",
-                                                     *c.subdir,
-                                                     fmt::join(sc.list, ", ")));
+                case SpecialCommentKeyword::namespace_:
+                    if (c.namespace_) {
+                        errors.push_back(
+                            fmt::format("Multiple `#namespace` annotations, first value: "
+                                        "{}, second value: {}",
+                                        *c.namespace_,
+                                        fmt::join(sc.list, ", ")));
                         break;
                     }
                     if (sc.list.size() != 1) {
-                        errors.push_back(fmt::format("`#subdir` needs a single value, got: {}",
+                        errors.push_back(fmt::format("`#namespace` needs a single value, got: {}",
                                                      fmt::join(sc.list, ", ")));
                         break;
                     }
-                    c.subdir = path_from_string(sc.list.front());
+                    c.namespace_ = path_from_string(sc.list.front());
                     break;
             }
         } else if (auto entityKind = enum_from_name<EntityKind>(sc.keyword)) {
@@ -401,7 +402,8 @@ std::expected<DirConfigFile, std::vector<std::string>> ParseDirConfigFile(
         errors.push_back("Directory config file has no parent path");
     }
     if (errors.empty()) {
-        return DirConfigFile{.parentDir = sourcePath.parent_path(), .subdir = std::move(c.subdir)};
+        return DirConfigFile{.parentDir = sourcePath.parent_path(),
+                             .namespace_ = std::move(c.namespace_)};
     }
     return std::unexpected(std::move(errors));
 }
