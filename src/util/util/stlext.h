@@ -106,3 +106,5 @@ std::optional<std::filesystem::path> relativePathIfCanonicalPrefixOrNullopt(
 /// Return `p.parent_path().stem()` if `p.has_parent_path()`, `nullopt` otherwise.
 std::optional<std::filesystem::path> parent_dirname(const std::filesystem::path& p);
 */
+
+std::string_view to_string_view(std::filesystem::file_type x);

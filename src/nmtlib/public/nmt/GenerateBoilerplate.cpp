@@ -215,7 +215,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
         return it->second;
     };
 
-    auto entityIds = project.entities.itemsWithEntities();
+    auto entityIds = project.entities().itemsWithEntities();
 
     /*
     TargetSubdirOfSourcePath targetSubdirOfSourcePath(project.dirConfigFiles);
@@ -228,7 +228,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
     flat_hash_map<int64_t, int64_t> membersToContainingEntityMap;
     {
         for (auto id : entityIds) {
-            auto& e = project.entities.entity(id);
+            auto& e = project.entities().entity(id);
             if (auto* memfn = std::get_if<EntityDependentProperties::MemFn>(&e.dependentProps)) {
                 if (e.sourcePath.has_parent_path()) {
                     auto parentPath = e.sourcePath.parent_path();
@@ -238,7 +238,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                         auto testPath = parentPath;
                         testPath.replace_extension(hx);
                         if (auto maybeId =
-                                project.entities.findEntityBySourcePath(e.targetId, testPath)) {
+                                project.entities().findEntityBySourcePath(e.targetId, testPath)) {
                             matchingContainingEntities.push_back(*maybeId);
                             matchingContainingSourceFiles.push_back(std::move(testPath));
                         }
@@ -278,9 +278,9 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
         }
     }
     for (auto id : entityIds) {
-        auto& e = project.entities.entity(id);
-        auto targetIt = project.targets.find(e.targetId);
-        CHECK(targetIt != project.targets.end());
+        auto& e = project.entities().entity(id);
+        auto targetIt = project.targets().find(e.targetId);
+        CHECK(targetIt != project.targets().end());
         auto& target = targetIt->second;
         auto& gfw = addGfw(target.outputDir, e.targetId);
         bool generateHeader;
@@ -303,7 +303,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                 IncludeSectionBuilder includes(project);
                 auto addNeedsAsHeaders =
                     [&includes, &e, &project](const std::vector<std::string>& needs) {
-                        includes.addNeedsAsHeaders(project.entities, e, needs);
+                        includes.addNeedsAsHeaders(project.entities(), e, needs);
                     };
                 switch (e.GetEntityKind()) {
                     case EntityKind::enum_:
@@ -328,7 +328,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                         auto it = containingEntityToMembersMap.find(id);
                         if (it != containingEntityToMembersMap.end()) {
                             for (auto& mfid : it->second) {
-                                auto& me = project.entities.entity(mfid);
+                                auto& me = project.entities().entity(mfid);
                                 assert(me.GetEntityKind() == EntityKind::memfn);
                                 auto& dp = std::get<std::to_underlying(EntityKind::memfn)>(
                                     me.dependentProps);
@@ -346,7 +346,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                         auto it = containingEntityToMembersMap.find(id);
                         if (it != containingEntityToMembersMap.end()) {
                             for (auto& mfid : it->second) {
-                                auto& me = project.entities.entity(mfid);
+                                auto& me = project.entities().entity(mfid);
                                 assert(me.GetEntityKind() == EntityKind::memfn);
                                 auto& dp = std::get<std::to_underlying(EntityKind::memfn)>(
                                     me.dependentProps);

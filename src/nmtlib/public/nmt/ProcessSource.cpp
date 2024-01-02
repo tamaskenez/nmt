@@ -49,30 +49,30 @@ ProcessSourceResult::V ProcessSource(int64_t targetId,
 std::pair<std::vector<std::string>, std::vector<std::string>> ProcessSourceAndUpdateProject(
     Project& project, Entities::Id id, bool verbose) {
     std::vector<std::string> errors, verboseMessages;
-    auto& sourcePath = project.entities.sourcePath(id);
+    auto& sourcePath = project.entities().sourcePath(id);
     std::error_code ec;
     auto lastWriteTime = std::filesystem::last_write_time(sourcePath, ec);
     if (ec) {
         lastWriteTime = std::filesystem::file_time_type::min();
     }
-    auto targetId = project.entities.targetId(id);
+    auto targetId = project.entities().targetId(id);
     switch_variant(
-        ProcessSource(targetId, project.targets.at(targetId).sourceDir, sourcePath),
+        ProcessSource(targetId, project.targets().at(targetId).sourceDir, sourcePath),
         [&](Entity&& x) {
-            project.entities.updateSourceWithEntity(id, std::move(x));
+            project.entities_updateSourceWithEntity(id, std::move(x));
         },
         [&](DirConfigFile&& x) {
-            project.dirConfigFiles[sourcePath] = std::move(x);
+            project.dirConfigFiles()[sourcePath] = std::move(x);
         },
         [&](ProcessSourceResult::SourceWithoutSpecialComments) {
-            project.entities.updateSourceNoSpecialComments(id, lastWriteTime);
+            project.entities_updateSourceNoSpecialComments(id, lastWriteTime);
             if (verbose) {
                 verboseMessages.push_back(
                     fmt::format("Ignoring file without NMT annotations: {}", sourcePath));
             }
         },
         [&](ProcessSourceResult::CantReadFile) {
-            project.entities.updateSourceCantReadFile(id);
+            project.entities_updateSourceCantReadFile(id);
             errors.push_back(fmt::format("Can't read file: {}", sourcePath));
         },
         [&](ProcessSourceResult::Error&& x) {
@@ -80,7 +80,7 @@ std::pair<std::vector<std::string>, std::vector<std::string>> ProcessSourceAndUp
                 errors.push_back(
                     fmt::format("Failed to process file {}, reason: {}", sourcePath, m));
             }
-            project.entities.updateSourceError(id, std::move(x.messages), lastWriteTime);
+            project.entities_updateSourceError(id, std::move(x.messages), lastWriteTime);
         });
     return make_pair(std::move(errors), std::move(verboseMessages));
 }

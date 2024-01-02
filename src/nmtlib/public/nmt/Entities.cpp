@@ -4,9 +4,9 @@ namespace fs = std::filesystem;
 namespace ItemState = EntitiesItemState;
 using namespace vx;
 
-std::expected<std::monostate, std::string> Entities::addSource(int64_t targetId,
-                                                               const fs::path& targetSourceDir,
-                                                               const std::filesystem::path& path) {
+std::expected<int64_t, std::string> Entities::addSource(int64_t targetId,
+                                                        const fs::path& targetSourceDir,
+                                                        const std::filesystem::path& path) {
     std::error_code ec;
     auto canonicalPath = fs::weakly_canonical(path, ec);
     if (ec) {
@@ -22,7 +22,7 @@ std::expected<std::monostate, std::string> Entities::addSource(int64_t targetId,
         DCHECK(itb.second) << fmt::format("Duplicated source: {}", path);
     }
 
-    return {};
+    return id;
 }
 
 std::vector<Entities::Id> Entities::dirtySources() const {
@@ -173,4 +173,10 @@ void Entities::updateSourceError(Id id,
     auto it = items.find(id);
     CHECK(it != items.end()) << fmt::format("Item id #{} doesn't exist", id);
     it->second.state = ItemState::Error{std::move(errors), lastWriteTime};
+}
+
+const Entities::Item& Entities::source(Id id) const {
+    auto it = items.find(id);
+    CHECK(it != items.end()) << fmt::format("Source #{} doesn't exist", id);
+    return it->second;
 }

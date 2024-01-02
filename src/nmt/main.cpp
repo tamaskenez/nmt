@@ -1,5 +1,4 @@
 #include "nmt/GenerateBoilerplate.h"
-#include "nmt/GlobSourceFiles.h"
 #include "nmt/ProcessSource.h"
 #include "nmt/ProgramOptions.h"
 #include "nmt/Project.h"
@@ -106,18 +105,6 @@ int main(int argc, char* argv[]) {
 
     fmt::print("### NMT ###\n");
 
-    auto sourcesOr = GlobSourceFiles(args.sourceDir, args.verbose);
-    if (!sourcesOr) {
-        for (auto& m : sourcesOr.error()) {
-            fmt::print(stderr, "Error: {}\n", m);
-        }
-        return EXIT_FAILURE;
-    }
-    auto sources = std::move(*sourcesOr);
-    for (auto& m : sources.messages) {
-        fmt::print("{}\n", m);
-    }
-
     Project project;
     auto addTargetResult = project.addTarget(args.target, args.sourceDir, args.outputDir);
     if (!addTargetResult) {
@@ -126,16 +113,8 @@ int main(int argc, char* argv[]) {
         }
         return EXIT_FAILURE;
     }
-    auto targetId = *addTargetResult;
-    auto& target = project.targets.at(targetId);
     std::vector<std::string> verboseMessages, errors;
-    for (auto& s : sources.sources) {
-        auto r = project.entities.addSource(targetId, target.sourceDir, s);
-        if (!r) {
-            errors.push_back(std::move(r.error()));
-        }
-    }
-    for (auto id : project.entities.dirtySources()) {
+    for (auto id : project.entities().dirtySources()) {
         auto [newErrors, newVerboseMessages] =
             ProcessSourceAndUpdateProject(project, id, args.verbose);
         append_range(errors, std::move(newErrors));

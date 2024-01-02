@@ -56,3 +56,22 @@ std::optional<std::filesystem::path> parent_dirname(const std::filesystem::path&
     return *it;
 }
 */
+
+std::string_view to_string_view(fs::file_type x) {
+    switch (x) {
+#define CASE(X)            \
+    case fs::file_type::X: \
+        return #X;
+        CASE(none)
+        CASE(not_found)
+        CASE(regular)
+        CASE(directory)
+        CASE(symlink)
+        CASE(block)
+        CASE(character)
+        CASE(fifo)
+        CASE(socket)
+        CASE(unknown)
+#undef CASE
+    }
+}

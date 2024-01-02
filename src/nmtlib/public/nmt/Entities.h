@@ -28,8 +28,14 @@ using V = std::variant<NewSource, CantReadFile, SourceWithoutSpecialComments, Er
 class Entities {
    public:
     using Id = int64_t;
+    struct Item {
+        int64_t targetId;
+        const std::filesystem::path& sourcePath;  // points to sourcePathToId keys
+        EntitiesItemState::V state;
+    };
+
     /// Adding a source which has already been added is an error in Debug, ignored in Release.
-    [[nodiscard]] std::expected<std::monostate, std::string> addSource(
+    [[nodiscard]] std::expected<int64_t, std::string> addSource(
         int64_t targetId,
         const std::filesystem::path& targetSourceDir,
         const std::filesystem::path& path);
@@ -43,6 +49,9 @@ class Entities {
     /// It's an error if there's no entity for `id` (either because `id` doesn't exist or the item
     /// at `id` has no entity)
     const Entity& entity(Id id) const;
+
+    /// It's an error if `id` doesn't exist.
+    const Entities::Item& source(Id id) const;
 
     /// It's an error if there's no item for`id`.
     const std::filesystem::path& sourcePath(Id id) const;
@@ -67,11 +76,6 @@ class Entities {
                            std::filesystem::file_time_type lastWriteTime);
 
    private:
-    struct Item {
-        int64_t targetId;
-        const std::filesystem::path& sourcePath;  // points to sourcePathToId keys
-        EntitiesItemState::V state;
-    };
     flat_hash_map<Id, Item> items;
     node_hash_map<std::filesystem::path, Id, path_hash>
         sourcePathToId;  // Keys must have stable addresses, Item::sourcePath is a reference to the

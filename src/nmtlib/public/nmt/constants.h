@@ -19,6 +19,7 @@ constexpr std::string_view k_nmtIncludeMemberDeclarationsMacro = "NMT_MEMBER_DEC
 inline const std::filesystem::path k_publicSubdir = "public";
 inline const std::filesystem::path k_privateSubdir = "private";
 constexpr std::string_view k_memberDeclarationsFilenamePostfix = "#memberDecls";
+constexpr std::string_view k_membersDirPostfix = "#members";
 
 struct MemberDefinitionMacro {
     std::string_view name;
