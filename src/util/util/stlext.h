@@ -108,3 +108,6 @@ std::optional<std::filesystem::path> parent_dirname(const std::filesystem::path&
 */
 
 std::string_view to_string_view(std::filesystem::file_type x);
+std::string_view substrview(const std::string& s,
+                            std::string_view::size_type pos = 0,
+                            std::string_view::size_type count = std::string_view::npos);

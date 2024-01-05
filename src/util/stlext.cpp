@@ -75,3 +75,9 @@ std::string_view to_string_view(fs::file_type x) {
 #undef CASE
     }
 }
+
+std::string_view substrview(const std::string& s,
+                            std::string_view::size_type pos,
+                            std::string_view::size_type count) {
+    return std::string_view(s).substr(pos, count);
+}

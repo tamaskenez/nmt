@@ -51,11 +51,14 @@ struct Project {
     DirConfigFiles& dirConfigFiles() {
         return _dirConfigFiles;
     }
+
+    struct AddTargetResult {
+        int64_t targetId;
+        std::vector<std::string> nonFatalErrors, verboseMessages;
+    };
     /// Glob-recurse `sourceDir`, add sources and full tree for target.
-    /// Return: target id
-    std::expected<int64_t, std::string> addTarget(std::string targetName,
-                                                  std::filesystem::path sourceDir,
-                                                  std::filesystem::path outputDir);
+    [[nodiscard]] std::expected<AddTargetResult, std::string> addTarget(
+        std::string targetName, std::filesystem::path sourceDir, std::filesystem::path outputDir);
     /// Return: target id
     std::optional<int64_t> findTargetByName(std::string_view name) const;
 
@@ -101,4 +104,12 @@ struct Project {
     /// Return errors during directory traversal but try reading everything.
     [[nodiscard]] AddSourcesAndTreeItemsRecursivelyResult addSourcesAndTreeItemsRecursively(
         int64_t targetId, int64_t subdirTreeItemId);
+
+    struct AddSourcesFromMemberDirResult {
+        std::vector<int64_t> children;
+        std::vector<std::string> errors, verboseMessages;
+    };
+    AddSourcesFromMemberDirResult addSourcesFromMemberDir(int64_t targetId,
+                                                          const std::filesystem::path& memberDir,
+                                                          int64_t structClassTreeItemId);
 };

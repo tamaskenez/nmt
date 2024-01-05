@@ -106,12 +106,25 @@ int main(int argc, char* argv[]) {
     fmt::print("### NMT ###\n");
 
     Project project;
-    auto addTargetResult = project.addTarget(args.target, args.sourceDir, args.outputDir);
-    if (!addTargetResult) {
-        for (auto& m : addTargetResult.error()) {
-            fmt::print(stderr, "Error: can't add target {}, reason: ", args.target, m);
+    auto addTargetResultOr = project.addTarget(args.target, args.sourceDir, args.outputDir);
+    if (!addTargetResultOr) {
+        fmt::print(stderr,
+                   "Error: can't add target {}, reason: {}\n",
+                   args.target,
+                   addTargetResultOr.error());
+        return EXIT_FAILURE;
+    }
+    auto& addTargetResult = *addTargetResultOr;
+    if (!addTargetResult.nonFatalErrors.empty()) {
+        for (auto& m : addTargetResult.nonFatalErrors) {
+            fmt::print(stderr, "Error: during adding target {}: {}\n", args.target, m);
         }
         return EXIT_FAILURE;
+    }
+    if (args.verbose) {
+        for (auto& m : addTargetResult.verboseMessages) {
+            fmt::print(stderr, "During adding target {}: {}\n", args.target, m);
+        }
     }
     std::vector<std::string> verboseMessages, errors;
     for (auto id : project.entities().dirtySources()) {

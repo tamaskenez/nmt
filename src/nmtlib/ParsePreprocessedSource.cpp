@@ -1,5 +1,7 @@
 #include "ParsePreprocessedSource.h"
+
 #include "TokenSearch.h"
+#include "nmtutil.h"
 
 namespace fs = std::filesystem;
 
@@ -78,7 +80,7 @@ std::expected<std::string, std::string> ExtractFunctionDeclaration(
             return std::unexpected(
                 className ? fmt::format(
                     "Pattern <class-name>::<memfn-name> not found ({}::{})", *className, name)
-                          : fmt::format("Pattern <fn-name> not found ({})", name));
+                          : fmt::format("Pattern <fn-name> not found (\"{}\")", name));
         }
         if (searchResult.has_value()) {
             // The `(` was also found.
@@ -218,10 +220,7 @@ std::expected<Collector, std::vector<std::string>> collectSpecialComments(
 std::expected<ParsePreprocessedSourceResult, std::vector<std::string>> ParsePreprocessedSource(
     const PreprocessedSource& pps, const fs::path& sourcePath) {
     std::string name = path_to_string(sourcePath.stem());
-    std::optional<std::string> parentDirName;
-    if (sourcePath.has_parent_path()) {
-        parentDirName = path_to_string(sourcePath.parent_path().stem());
-    }
+    auto containingStructOrClassName = extractContainingStructOrClassNameFromMemberDir(sourcePath);
 
     TRY_ASSIGN(c, collectSpecialComments(pps.specialComments));
     if (!c.entityKind) {
@@ -374,7 +373,8 @@ std::expected<ParsePreprocessedSourceResult, std::vector<std::string>> ParsePrep
             // Expected: ... classname :: name ( ... ) ... { ... }
             TRY_ASSIGN_OR_RETURN_VALUE(
                 declaration,
-                ExtractFunctionDeclaration(parentDirName, name, tokensFromFirstSpecialComment),
+                ExtractFunctionDeclaration(
+                    containingStructOrClassName, name, tokensFromFirstSpecialComment),
                 std::unexpected(make_vector(std::move(UNEXPECTED_ERROR))));
             dependentProps.emplace(
                 std::in_place_index<std::to_underlying(EntityKind::memfn)>,

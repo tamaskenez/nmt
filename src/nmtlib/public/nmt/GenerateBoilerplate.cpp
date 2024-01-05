@@ -1,27 +1,13 @@
 #include "nmt/GenerateBoilerplate.h"
 
 #include "GeneratedFileWriter.h"
+#include "nmtutil.h"
+
 #include "nmt/Project.h"
 
 namespace fs = std::filesystem;
 
 namespace {
-
-std::optional<std::string_view> ExtractIdentifier(std::string_view sv) {
-    auto r = trim(sv);
-    if (r.empty()) {
-        return std::nullopt;
-    }
-    if (isdigit(r.front())) {
-        return std::nullopt;
-    }
-    for (auto c : r) {
-        if (!isalnum(c) && c != '_') {
-            return std::nullopt;
-        }
-    }
-    return r;
-}
 
 struct IncludeSectionBuilder {
     explicit IncludeSectionBuilder(const Project& project)
@@ -108,15 +94,14 @@ struct IncludeSectionBuilder {
                     || need.starts_with("enum ")) {
                     auto spaceIdx = need.find(' ');
                     assert(spaceIdx != std::string_view::npos);
-                    auto identifier =
-                        ExtractIdentifier(need.substr(spaceIdx, need.size() - spaceIdx));
-                    if (!identifier) {
+                    auto identifier = trim(need.substr(spaceIdx, need.size() - spaceIdx));
+                    if (!isCIdentifier(identifier)) {
                         errors.push_back(
                             fmt::format("Forward declaration {} needs a c-identifier", need));
                         continue;
                     }
                     forwardDeclarations.push_back(
-                        fmt::format("{} {};", need.substr(0, spaceIdx), *identifier));
+                        fmt::format("{} {};", need.substr(0, spaceIdx), identifier));
                 } else {
                     std::string_view needName = need;
                     const bool refOnly = needName.back() == '*';
@@ -229,13 +214,21 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
     {
         for (auto id : entityIds) {
             auto& e = project.entities().entity(id);
+            fmt::print("- {}\n", e.sourcePath);
             if (auto* memfn = std::get_if<EntityDependentProperties::MemFn>(&e.dependentProps)) {
+                std::optional<fs::path> parentBasePath;
                 if (e.sourcePath.has_parent_path()) {
                     auto parentPath = e.sourcePath.parent_path();
+                    if (auto structOrClassName =
+                            extractContainingStructOrClassNameFromMemberDir(parentPath)) {
+                        parentBasePath = parentPath.replace_filename(*structOrClassName);
+                    }
+                }
+                if (parentBasePath) {
                     std::vector<int64_t> matchingContainingEntities;
                     std::vector<fs::path> matchingContainingSourceFiles;
                     for (auto hx : k_validSourceExtensions) {
-                        auto testPath = parentPath;
+                        auto testPath = *parentBasePath;
                         testPath.replace_extension(hx);
                         if (auto maybeId =
                                 project.entities().findEntityBySourcePath(e.targetId, testPath)) {
@@ -395,8 +388,8 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                     // generate output files according to relative dirs.
                     // TODO (not here): check how fmt::format formats paths on Windows (unicode)
                     // TODO: for k_nmtIncludeMemberDeclarationsMacro consider using either R""
-                    // literals or generic_path, because of the slashes and other characters. Also
-                    // need to verify how unicode paths work.
+                    // literals or generic_path, because of the slashes and other characters.
+                    // Also need to verify how unicode paths work.
                     auto it = containingEntityToMembersMap.find(id);
                     fs::path memberDeclarationsPath;
                     if (it == containingEntityToMembersMap.end()) {
@@ -408,7 +401,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                         }
                         mdContent += "\n";
                         for (auto& mfid : it->second) {
-                            auto& mfe = project.entities.entity(mfid);
+                            auto& mfe = project.entities().entity(mfid);
                             auto& dp =
                                 std::get<std::to_underlying(EntityKind::memfn)>(mfe.dependentProps);
                             mdContent += fmt::format("{}\n", dp.declaration);
@@ -446,7 +439,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                                           project.headerPath(false, id));
                 IncludeSectionBuilder includes(project);
 
-                includes.addNeedsAsHeaders(project.entities, e, dp.definitionNeeds);
+                includes.addNeedsAsHeaders(project.entities(), e, dp.definitionNeeds);
                 auto renderedHeadersOr = includes.render();
                 if (!renderedHeadersOr) {
                     append_range(errors, std::move(renderedHeadersOr.error()));
@@ -467,7 +460,7 @@ std::expected<std::monostate, std::vector<std::string>> GenerateBoilerplate(
                                           k_autogeneratedWarningLine,
                                           project.headerPath(false, ceId));
                 IncludeSectionBuilder includes(project);
-                includes.addNeedsAsHeaders(project.entities, e, dp.definitionNeeds);
+                includes.addNeedsAsHeaders(project.entities(), e, dp.definitionNeeds);
                 auto renderedHeadersOr = includes.render();
                 if (!renderedHeadersOr) {
                     append_range(errors, std::move(renderedHeadersOr.error()));

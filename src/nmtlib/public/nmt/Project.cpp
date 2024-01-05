@@ -1,24 +1,82 @@
 #include "nmt/Project.h"
 
+#include "nmtutil.h"
+
 #include "nmt/ProcessSource.h"
 
 namespace fs = std::filesystem;
 
-namespace {
-fs::path structOrClassSourcePathToMemberDir(fs::path path) {
-    DCHECK(!path.empty() && k_validSourceExtensions.contains(path.extension()));
-    return path.replace_filename(path_from_string(
-        fmt::format("{}{}", path_to_string(path.filename()), k_membersDirPostfix)));
-}
+Project::AddSourcesFromMemberDirResult Project::addSourcesFromMemberDir(
+    int64_t targetId, const fs::path& memberDir, int64_t structClassTreeItemId) {
+    auto& target = _targets.at(targetId);
 
-bool isPathLikeMemberDir(const fs::path& path) {
-    if (path.has_extension()) {
-        return false;
+    std::vector<int64_t> children;
+    std::vector<std::string> errors, verboseMessages;
+    std::error_code ec;
+    auto dit = fs::directory_iterator(memberDir, ec);
+    if (ec) {
+        return AddSourcesFromMemberDirResult{
+            .errors = make_vector(
+                fmt::format("Can't read directory `{}`, reason: {}", memberDir, ec.message())),
+        };
     }
-    auto filename = path_to_string(path.filename());
-    return filename.size() > k_membersDirPostfix.size() && filename.ends_with(k_membersDirPostfix);
+    for (; dit != fs::directory_iterator(); ++dit) {
+        auto status = dit->status(ec);
+        if (ec) {
+            errors.push_back(fmt::format(
+                "Can't get status of file `{}`, reason: {}", dit->path(), ec.message()));
+            continue;
+        }
+        switch (status.type()) {
+            using enum fs::file_type;
+            case not_found:
+                errors.push_back(fmt::format("File `{}` has a type of `not_found` and "
+                                             "that's strange, what "
+                                             "should we do with that? For now it's an error",
+                                             dit->path()));
+                break;
+            case regular: {
+                auto ext = dit->path().extension();
+                if (k_validSourceExtensions.contains(ext)) {
+                    if (auto sourceIdOr =
+                            _entities.addSource(targetId, target.sourceDir, dit->path())) {
+                        auto childId = _nextId++;
+                        _treeItems.insert(std::make_pair(
+                            childId,
+                            ProjectTreeItem::LeafSource{.parentTreeItem = structClassTreeItemId,
+                                                        .sourceId = *sourceIdOr}));
+                        children.push_back(childId);
+                    } else {
+                        errors.push_back(std::move(sourceIdOr.error()));
+                    }
+                } else {
+                    verboseMessages.push_back(
+                        fmt::format("Ignoring file with extension `{}`: {}", ext, dit->path()));
+                }
+            } break;
+            case directory:
+                verboseMessages.push_back(fmt::format("Directory `{}` ignored: it's inside a "
+                                                      "directory for struct/class members.",
+                                                      dit->path()));
+                break;
+            case none:
+            case symlink:
+            case block:
+            case character:
+            case fifo:
+            case socket:
+            case unknown:
+                errors.push_back(fmt::format("File `{}` has a type of {} and it's not yet "
+                                             "decided what to do with this type",
+                                             dit->path(),
+                                             to_string_view(status.type())));
+                break;
+        }
+    }
+    return AddSourcesFromMemberDirResult{.children = std::move(children),
+                                         .errors = std::move(errors),
+                                         .verboseMessages = std::move(verboseMessages)};
 }
-}  // namespace
 
 Project::AddSourcesAndTreeItemsRecursivelyResult Project::addSourcesAndTreeItemsRecursively(
     int64_t targetId, int64_t subdirTreeItemId) {
@@ -55,10 +113,34 @@ Project::AddSourcesAndTreeItemsRecursivelyResult Project::addSourcesAndTreeItems
                     if (auto sourceIdOr =
                             _entities.addSource(targetId, target.sourceDir, dit->path())) {
                         auto childId = _nextId++;
-                        _treeItems.insert(std::make_pair(
-                            childId,
-                            ProjectTreeItem::LeafSource{.parentTreeItem = subdirTreeItemId,
-                                                        .sourceId = *sourceIdOr}));
+                        auto memberDir = structOrClassSourcePathToMemberDir(dit->path());
+                        bool memberDirIsDirectory =
+                            fs::exists(memberDir, ec) && fs::is_directory(memberDir, ec);
+                        if (ec) {
+                            result.errors.push_back(
+                                fmt::format("Can't check if path `{}` is a directory, reason: {}",
+                                            memberDir,
+                                            ec.message()));
+                        }
+                        if (memberDirIsDirectory) {
+                            auto asfmdResult =
+                                addSourcesFromMemberDir(targetId, memberDir, childId);
+                            append_range(result.errors, std::move(asfmdResult.errors));
+                            append_range(result.verboseMessages,
+                                         std::move(asfmdResult.verboseMessages));
+                            _treeItems.insert(
+                                std::make_pair(childId,
+                                               ProjectTreeItem::StructOrClass{
+                                                   .sourceId = *sourceIdOr,
+                                                   .parentTreeItem = subdirTreeItemId,
+                                                   .sourceDir = memberDir,
+                                                   .children = std::move(asfmdResult.children)}));
+                        } else {
+                            _treeItems.insert(std::make_pair(
+                                childId,
+                                ProjectTreeItem::LeafSource{.parentTreeItem = subdirTreeItemId,
+                                                            .sourceId = *sourceIdOr}));
+                        }
                         subdir.children.push_back(childId);
                     } else {
                         result.errors.push_back(std::move(sourceIdOr.error()));
@@ -97,9 +179,9 @@ Project::AddSourcesAndTreeItemsRecursivelyResult Project::addSourcesAndTreeItems
     return result;
 }
 
-std::expected<int64_t, std::string> Project::addTarget(std::string targetName,
-                                                       fs::path sourceDir,
-                                                       fs::path outputDir) {
+std::expected<Project::AddTargetResult, std::string> Project::addTarget(std::string targetName,
+                                                                        fs::path sourceDir,
+                                                                        fs::path outputDir) {
     CHECK(!targetName.empty());
     if (auto maybeId = findTargetByName(targetName)) {
         return std::unexpected(fmt::format("Target {} already exists", targetName));
@@ -138,8 +220,10 @@ std::expected<int64_t, std::string> Project::addTarget(std::string targetName,
     std::ranges::sort(_targetsDisplayOrder, {}, [this](int64_t targetId) -> const std::string& {
         return _targets.at(targetId).name;
     });
-    addSourcesAndTreeItemsRecursively(targetId, treeItemId);
-    return targetId;
+    auto r = addSourcesAndTreeItemsRecursively(targetId, treeItemId);
+    return AddTargetResult{.targetId = targetId,
+                           .nonFatalErrors = std::move(r.errors),
+                           .verboseMessages = std::move(r.verboseMessages)};
 }
 
 std::optional<int64_t> Project::findTargetByName(std::string_view name) const {
@@ -224,17 +308,21 @@ void Project::updateSourceInTree(int64_t id) {
     auto& source = _entities.source(id);
     auto* entity = std::get_if<Entity>(&source.state);
     bool structOrClass;
-    switch (entity->GetEntityKind()) {
-        case EntityKind::enum_:
-        case EntityKind::fn:
-        case EntityKind::header:
-        case EntityKind::memfn:
-            structOrClass = false;
-            break;
-        case EntityKind::struct_:
-        case EntityKind::class_:
-            structOrClass = true;
-            break;
+    if (entity) {
+        switch (entity->GetEntityKind()) {
+            case EntityKind::enum_:
+            case EntityKind::fn:
+            case EntityKind::header:
+            case EntityKind::memfn:
+                structOrClass = false;
+                break;
+            case EntityKind::struct_:
+            case EntityKind::class_:
+                structOrClass = true;
+                break;
+        }
+    } else {
+        structOrClass = false;
     }
     auto treeItemId = findTreeItemBySourcePath(source.targetId, source.sourcePath);
     CHECK(treeItemId) << fmt::format(
