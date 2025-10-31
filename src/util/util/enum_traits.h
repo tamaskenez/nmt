@@ -9,8 +9,6 @@
 #include <type_traits>
 #include <utility>
 
-// For usage, see enum_traits.cpp
-
 template<typename Enum>
 struct enum_traits {};
 
